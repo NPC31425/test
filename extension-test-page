@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Extension External Connect Test</title>
+</head>
+<body>
+    <h1>外部网页：测试 externally_connectable</h1>
+    <p>点击按钮，尝试向扩展程序发送消息。</p>
+    <button id="sendMessageButton">发送消息给扩展</button>
+    <p>来自扩展程序的响应：<span id="response">等待响应...</span></p>
+
+    <script>
+        // *** 替换为你的扩展程序的 ID ***
+        const EXTENSION_ID = "YOUR_EXTENSION_ID_HERE"; 
+
+        document.getElementById('sendMessageButton').addEventListener('click', () => {
+            document.getElementById('response').textContent = '正在发送...';
+            
+            // 尝试通过 runtime.sendMessage 发送消息给扩展程序
+            chrome.runtime.sendMessage(EXTENSION_ID, { message: "Hello from GitHub Page!" }, function(response) {
+                if (chrome.runtime.lastError) {
+                    // 如果连接失败，会在这里捕获错误
+                    document.getElementById('response').textContent = 
+                        `发送失败/未收到响应: ${chrome.runtime.lastError.message}`;
+                    console.error("Connection failed:", chrome.runtime.lastError.message);
+                } else {
+                    document.getElementById('response').textContent = `收到响应: ${response ? response.reply : '无响应'}`;
+                    console.log("Received response:", response);
+                }
+            });
+        });
+
+        // 也可以使用 chrome.runtime.connect() 进行长连接测试
+        // ...
+    </script>
+</body>
+</html>
