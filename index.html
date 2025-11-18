@@ -4,60 +4,227 @@
 <head>
     <meta charset="utf-8">
     <title>Web Page Test</title>
+    <style>
+        img {
+            width: 50px;
+            height: 50px;
+            border: 2px solid #ccc;
+            margin-right: 10px;
+            vertical-align: middle;
+        }
+
+        .success-box {
+            border-color: green !important;
+        }
+
+        .fail-box {
+            border-color: red !important;
+        }
+
+        .log-area {
+            border: 1px solid #ccc;
+            padding: 10px;
+            margin-top: 10px;
+            max-height: 200px;
+            overflow-y: auto;
+            background-color: #f9f9f9;
+            font-family: monospace;
+            white-space: pre-wrap;
+        }
+
+        .log-success {
+            color: green;
+            font-weight: bold;
+        }
+
+        .log-failure {
+            color: red;
+            font-weight: bold;
+        }
+
+        button {
+            margin-top: 5px;
+            margin-bottom: 10px;
+            padding: 8px 15px;
+        }
+
+        .test-section {
+            border: 1px dashed #aaa;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+    </style>
 </head>
 
 <body>
-    <h1>网页到扩展程序的通信测试</h1>
-    <p>当前 URL **必须**是 <code>https://*.github.io/*</code> 才能成功连接。</p>
-    <p>请打开浏览器控制台（F12）查看结果。</p>
+    <h1>扩展功能测试页面</h1>
+    <p>当前 URL **必须**是 <code>https://*.github.io/*</code>。</p>
+    <hr>
+
+    <div id="logOutput" class="log-area">
+        <strong>页面日志输出:</strong>
+    </div>
 
     <script>
-        const TARGET_EXT_A_ID = "becggllopbkfnfejhicfaphcinfkmpfo";
+        const EXTERNALLY_CONNECTABLE_ID = "becggllopbkfnfejhicfaphcinfkmpfo";
+        const WEB_ACCESSIBLE_RESOURCES_ID = "objfbcobfecdahjlgiijgfkdpjfieill";
 
-        console.log(`--- 网页开始向 ${TARGET_EXT_A_ID} 发送测试 ---`);
+        /**
+         * 统一的日志函数：同时输出到控制台和页面
+         * @param {string} message 
+         * @param {boolean} isSuccess 
+         */
+        function logToPage(message, isSuccess = null) {
+            const logDiv = document.getElementById('logOutput');
+            const p = document.createElement('p');
 
-        // 检查扩展程序通信 API 是否可用
-        if (typeof chrome !== 'undefined' && chrome.runtime) {
+            p.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            if (isSuccess === true) {
+                p.classList.add('log-success');
+                console.log(`%c${message}`, 'color: green; font-weight: bold;');
+            } else if (isSuccess === false) {
+                p.classList.add('log-failure');
+                console.error(message);
+            } else {
+                console.log(message);
+            }
 
-            // 1. 测试一次性消息 (runtime.sendMessage)
+            // 将新日志添加到顶部
+            logDiv.prepend(p);
+        }
+
+        // --- 资源访问测试函数 ---
+
+        /**
+         * 触发资源加载测试
+         * @param {string} imgElementId 
+         * @param {boolean} expectedSuccess 
+         * @param {string} resourcePath 
+         */
+        function triggerResourceTest(imgElementId, expectedSuccess, resourcePath) {
+            logToPage(`--- 资源测试: ${resourcePath} (预期: ${expectedSuccess ? '成功' : '失败'}) ---`);
+
+            const img = document.getElementById(imgElementId);
+            const resourceUrl = `chrome-extension://${WEB_ACCESSIBLE_RESOURCES_ID}/images/${resourcePath}`;
+
+            if (!img) {
+                logToPage(`错误: 未找到元素 ${imgElementId}`, false);
+                return;
+            }
+
+            img.onload = () => {
+                img.classList.remove('fail-box');
+                img.classList.add('success-box');
+                const msg = `[${imgElementId}] 加载成功。结果: ${expectedSuccess ? '符合预期' : '不符合预期/意外成功'}`;
+                logToPage(msg, expectedSuccess);
+            };
+
+            img.onerror = () => {
+                img.classList.remove('success-box');
+                img.classList.add('fail-box');
+                const msg = `[${imgElementId}] 加载失败。结果: ${expectedSuccess ? '不符合预期/意外失败' : '符合预期'}`;
+                logToPage(msg, !expectedSuccess);
+            };
+        }
+
+        // --- 通信测试函数 ---
+
+        function triggerOneTimeMessage() {
+            logToPage(`--- 通信测试: 一次性消息 (sendMessage) ---`);
+
+            if (typeof chrome === 'undefined' || !chrome.runtime) {
+                logToPage("错误：无法访问 chrome.runtime API。", false);
+                return;
+            }
+
             chrome.runtime.sendMessage(
-                TARGET_EXT_A_ID,
+                EXTERNALLY_CONNECTABLE_ID,
                 { command: "WEB_PAGE_ONETIME_MESSAGE" },
                 function (response) {
                     if (chrome.runtime.lastError) {
-                        console.error("[网页 失败] 网页消息失败:", chrome.runtime.lastError.message);
-                        console.error("失败原因通常是：扩展程序未加载、ID错误，或URL未在externally_connectable中匹配。");
+                        const msg = `[sendMessage] 消息失败: ${chrome.runtime.lastError.message}`;
+                        logToPage(msg, false);
                     } else {
-                        console.log("[网页 成功] 收到 Ext A 响应:", response);
+                        const msg = `[sendMessage] 收到 externally_connectable 响应: ${JSON.stringify(response)}`;
+                        logToPage(msg, true);
                     }
                 }
             );
+        }
 
-            // 2. 测试长期连接 (runtime.connect)
+        function triggerLongLivedConnection() {
+            logToPage(`--- 通信测试: 长期连接 (runtime.connect) ---`);
+
+            if (typeof chrome === 'undefined' || !chrome.runtime) {
+                logToPage("错误：无法访问 chrome.runtime API。", false);
+                return;
+            }
+
             try {
-                const port = chrome.runtime.connect(TARGET_EXT_A_ID, { name: "WebPage-Port" });
+                const port = chrome.runtime.connect(EXTERNALLY_CONNECTABLE_ID, { name: "WebPage-Port" });
+                logToPage(`[runtime.connect] 连接尝试建立...`, null);
 
                 port.onMessage.addListener(function (msg) {
-                    console.log("[网页 成功] 收到连接消息:", msg);
+                    const msgText = `[Port Message] 收到连接消息: ${JSON.stringify(msg)}`;
+                    logToPage(msgText, true);
                 });
 
                 port.onDisconnect.addListener(function () {
                     if (chrome.runtime.lastError) {
-                        console.error("[网页 失败] 连接断开错误:", chrome.runtime.lastError.message);
+                        const msg = `[Port Disconnect] 连接断开错误: ${chrome.runtime.lastError.message}`;
+                        logToPage(msg, false);
                     } else {
-                        console.log("[网页] 长期连接断开");
+                        logToPage("[Port Disconnect] 长期连接正常断开", true);
                     }
                 });
 
                 port.postMessage({ command: "WEB_PAGE_CONNECT_MESSAGE" });
 
             } catch (e) {
-                console.error("[网页 失败] 建立连接时发生异常:", e);
+                const msg = `[Port Error] 建立连接时发生异常: ${e.message}`;
+                logToPage(msg, false);
             }
-
-        } else {
-            console.error("无法访问 chrome.runtime。请确保扩展程序通信API在您的内核中已启用。");
         }
+    </script>
+
+    <div class="test-section">
+        <h2>资源访问测试 (目标: Test web_accessible_resources)</h2>
+        <p>
+            Testweb_accessible_resources ID (<span
+                id="web_accessible_resourcesIdDisplay">objfbcobfecdahjlgiijgfkdpjfieill</span>) 必须被手动替换。
+        </p>
+
+        <p>
+            <strong>允许的资源:</strong> web_accessible_resources 配置了 `matches: ["https://*.github.io/*"]`。
+            <img id="imgAllowed" alt="Allowed Image" class="fail-box">
+            <button onclick="triggerResourceTest('imgAllowed', true, 'black.png')">测试允许资源 (预期成功)</button>
+        </p>
+
+        <p>
+            <strong>被拒绝的资源:</strong> web_accessible_resources 只允许 扩展程序 访问，拒绝网页访问。
+            <img id="imgDenied" alt="Denied Image" class="fail-box">
+            <button onclick="triggerResourceTest('imgDenied', false, 'icon.png')">测试拒绝资源 (预期失败)</button>
+        </p>
+    </div>
+
+    <div class="test-section">
+        <h2>通信功能测试 (目标: Test externally_connectable)</h2>
+        <p>
+            Testexternally_connectable ID: <span
+                id="externally_connectableIdDisplay">becggllopbkfnfejhicfaphcinfkmpfo</span>
+        </p>
+
+        <button onclick="triggerOneTimeMessage()">测试一次性消息 (预期成功)</button>
+
+        <button onclick="triggerLongLivedConnection()">测试长期连接 (预期成功)</button>
+    </div>
+
+    <script>
+        // 初始化：替换 ID 显示
+        document.getElementById('web_accessible_resourcesIdDisplay').textContent = WEB_ACCESSIBLE_RESOURCES_ID;
+        document.getElementById('externally_connectableIdDisplay').textContent = EXTERNALLY_CONNECTABLE_ID;
+
+        logToPage("页面加载完成。请点击按钮开始测试。", null);
     </script>
 </body>
 
