@@ -125,6 +125,14 @@
                 const msg = `[${imgElementId}] 加载失败。结果: ${expectedSuccess ? '不符合预期/意外失败' : '符合预期'}`;
                 logToPage(msg, !expectedSuccess);
             };
+
+            // 在测试前替换 URL
+            img.src = resourceUrl;
+
+            // 强制重新设置 src 以确保加载被触发
+            const originalSrc = img.src;
+            img.src = '';
+            img.src = originalSrc;
         }
 
         // --- 通信测试函数 ---
