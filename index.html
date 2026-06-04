@@ -43,7 +43,7 @@
                     // 并在零点几毫秒内执行跨域重定向，强行让内核对当前页面执行 Tear Down（大卸八块）
                     // 此时，后面剩下的 29 个请求还在内核管道里排队执行 OnAccept() 流程
                     // 它们一睁眼，正好撞上老 Origin 被释放、摄像头字符串填坑的毁灭现场！
-                    window.location.href = "about:blank";
+                    // window.location.href = "about:blank";
                 })
                 .catch(err => {
                     console.log("请求被拒绝或取消");
