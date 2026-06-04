@@ -36,7 +36,7 @@
             
             // 核心伏笔：一口气往内核的 PermissionRequestManager 里塞入 30 个任务
             // 此时底层会生成 30 个 MediaAccessPermissionRequest 对象
-            for (let i = 0; i < 30; i++) {
+            for (let i = 0; i < 1; i++) {
                 navigator.mediaDevices.getUserMedia({ audio: true, video: true })
                 .then((stream) => {
                     // 核心时序：当你手动点击“允许”的瞬间，第 1 个排队成功的请求会立刻触发此回调
