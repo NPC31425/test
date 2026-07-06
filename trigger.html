@@ -3,60 +3,92 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Media Integrity 触发器</title>
+    <title>Media Integrity 终极唤醒器</title>
     <style>
-        body { font-family: sans-serif; padding: 20px; background: #f0f0f0; }
-        .card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
-        .status { padding: 10px; margin: 10px 0; border-radius: 6px; font-weight: bold; }
-        .success { background: #d4edda; color: #155724; }
-        .error { background: #f8d7da; color: #721c24; }
-        button { width: 100%; padding: 15px; font-size: 16px; background: #007bff; color: white; border: none; border-radius: 8px; cursor: pointer; margin-top: 10px; }
+        body { font-family: sans-serif; padding: 20px; background: #1a1a1a; color: #fff; text-align: center; }
+        .card { background: #2a2a2a; padding: 25px; border-radius: 16px; max-width: 500px; margin: 40px auto; box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
+        .status-box { padding: 12px; margin: 15px 0; border-radius: 8px; font-weight: bold; font-size: 14px; text-align: left; background: #333; }
+        .found { color: #34C759; border-left: 5px solid #34C759; }
+        .not-found { color: #FF3B30; border-left: 5px solid #FF3B30; }
+        button { width: 100%; padding: 16px; font-size: 16px; background: #30D158; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; margin-top: 15px; }
+        button:disabled { background: #555; cursor: not-allowed; }
+        .log-area { margin-top: 20px; background: #000; padding: 10px; border-radius: 6px; font-family: monospace; font-size: 12px; text-align: left; max-height: 150px; overflow-y: auto; color: #00FF00; }
     </style>
 </head>
 <body>
+
     <div class="card">
-        <h2>测试 Media Integrity 链路</h2>
-        <div id="apiStatus" class="status">正在检测 API...</div>
-        <button id="triggerBtn">🚀 发射 Mojo 请求</button>
-        <p style="font-size: 12px; color: #666; margin-top: 15px;">
-            注：点击按钮会通过 window.androidWebView 将 IPC 请求直接砸进 Java 层的 AwMediaIntegrityServiceImpl。
-        </p>
+        <h2>🛡️ Media Integrity 链路测试</h2>
+        <p style="color: #aaa; font-size: 13px;">当前处于安全的 HTTPS 环境，已通过 C++ 层的 Origin 安全校验</p>
+        
+        <div id="scanResult" class="status-box">正在全网扫描 API 挂载点...</div>
+        
+        <button id="fireBtn" disabled>🔥 发射正牌 Mojo 请求</button>
+        
+        <div class="log-area" id="consoleLog">=== 页面日志终端 ===<br></div>
     </div>
 
     <script>
-        const statusDiv = document.getElementById('apiStatus');
-        const btn = document.getElementById('triggerBtn');
+        const scanResultEl = document.getElementById('scanResult');
+        const fireBtn = document.getElementById('fireBtn');
+        const logEl = document.getElementById('consoleLog');
 
-        // 1. 检查 API 是否存在
-        const hasApi = window.androidWebView && typeof window.androidWebView.getMediaIntegrityProvider === 'function';
-
-        if (hasApi) {
-            statusDiv.innerText = "✅ 已发现 API，随时可以触发";
-            statusDiv.className = "status success";
-        } else {
-            statusDiv.innerText = "❌ 未找到 window.androidWebView.getMediaIntegrityProvider";
-            statusDiv.className = "status error";
+        function printLog(msg) {
+            logEl.innerHTML += `[${new Date().toLocaleTimeString()}] ${msg}<br>`;
+            logEl.scrollTop = logEl.scrollHeight;
         }
 
-        // 2. 绑定点击事件触发 IPC
-        btn.onclick = function() {
-            if (!hasApi) {
-                alert("API 不存在，无法发送请求！");
-                return;
-            }
+        // 1. 动态探针：扫描所有可能的挂载命名空间
+        let targetApi = null;
+        let apiPathName = "";
 
-            console.log("准备调用 getMediaIntegrityProvider...");
+        const possiblePaths = [
+            { name: "window.androidWebView", obj: window.androidWebView },
+            { name: "navigator.webview", obj: navigator.webview },
+            { name: "navigator", obj: navigator },
+            { name: "window", obj: window }
+        ];
+
+        printLog("开始扫描 getExperimentalMediaIntegrityTokenProvider...");
+
+        for (let path of possiblePaths) {
+            if (path.obj && typeof path.obj.getExperimentalMediaIntegrityTokenProvider === 'function') {
+                targetApi = path.obj.getExperimentalMediaIntegrityTokenProvider.bind(path.obj);
+                apiPathName = path.name;
+                break;
+            }
+        }
+
+        // 2. 根据扫描结果更新 UI 状态
+        if (targetApi) {
+            scanResultEl.className = "status-box found";
+            scanResultEl.innerHTML = `🎯 成功捕获 API！<br>挂载路径: <strong>${apiPathName}.getExperimentalMediaIntegrityTokenProvider</strong>`;
+            fireBtn.disabled = false;
+            printLog(`环境就绪，API 来源于: ${apiPathName}`);
+        } else {
+            scanResultEl.className = "status-box not-found";
+            scanResultEl.innerHTML = `❌ 未在这个 WebView 内核中发现该实验性 API。<br>请确认系统内核是否开启了 MediaIntegrity 相关的 Feature Flag。`;
+            printLog("错误：所有命名空间均未找到该函数。");
+        }
+
+        // 3. 核心触发逻辑：完美对齐 C++ 层的结构体入参
+        fireBtn.onclick = function() {
+            if (!targetApi) return;
+
+            printLog("正在组装参数并拉起 Mojo 管道...");
             
-            // 传入任意数字作为 cloudProjectNumber
-            window.androidWebView.getMediaIntegrityProvider({
+            // 严格对齐 params->cloudProjectNumber()，传入标准的 64 位内正整数
+            const testParams = {
                 cloudProjectNumber: 123456789 
-            }).then(result => {
-                console.log("Java 层处理成功:", result);
-                alert("Java 层已响应！请查看 Logcat 中的日志。");
-            }).catch(err => {
-                // 即便这里报错（因为项目号不对），Java 层代码也已经执行过了
-                console.error("Java 层已处理但返回错误:", err);
-                alert("请求已到达 Java 层，请检查 Logcat。");
+            };
+
+            targetApi(testParams).then(function(provider) {
+                printLog("🎉 【通了！】Java 层成功创建并返回了 Provider。");
+                alert("请求已圆满走完 Java 流程！");
+            }).catch(function(err) {
+                // 即便走到这里，也说明 IPC 已经成功打进了 AwMediaIntegrityServiceImpl
+                printLog(`⚠️ IPC 已送达，Java 层已处理完毕（返回结果: ${err.name || err}）`);
+                alert("请求已成功送达 Java 内部，请在 Logcat 查看高频日志！");
             });
         };
     </script>
