@@ -3,22 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Media Integrity 测试主页</title>
+    <title>控制台落地页</title>
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding: 20px; background: #121212; color: #e0e0e0; text-align: center; }
-        .container { max-width: 500px; margin: 80px auto; padding: 30px; background: #1e1e1e; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.5); }
-        h1 { color: #fff; font-size: 24px; margin-bottom: 10px; }
-        p { color: #aaa; font-size: 14px; line-height: 1.6; }
-        .start-btn { display: inline-block; width: 80%; padding: 15px; margin-top: 30px; background: #007AFF; color: #fff; text-decoration: none; font-weight: bold; border-radius: 8px; transition: background 0.2s; }
-        .start-btn:hover { background: #0056b3; }
+        body { font-family: sans-serif; background: #121212; color: #fff; text-align: center; padding-top: 100px; }
+        .btn { padding: 15px 35px; font-size: 16px; background: #007AFF; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>🎯 Media Integrity 复现大本营</h1>
-        <p>这是一个专门用来测试 Android WebView 媒体完整性接口并发崩溃的落地页。</p>
-        <p style="color: #34C759; margin-top: 15px;">💡 环境状态：安全 HTTPS (GitHub Pages)</p>
-        <a href="trigger.html" class="start-btn">➡️ 进入加特林轰炸测试页</a>
-    </div>
+    <h2>Media Integrity 自动撞车测试</h2>
+    <p style="color: #aaa;">点击下方按钮将打开新 Tab 并立即开始加特林轰炸</p>
+    <br>
+    <!-- 🎯 核心：通过新窗口打开，赋予新页面 window.close() 的特权 -->
+    <button class="btn" onclick="window.open('trigger.html', '_blank')">🚀 弹射新 Tab 并开轰</button>
 </body>
 </html>
