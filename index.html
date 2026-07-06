@@ -5,17 +5,43 @@
     <title>Media Integrity 崩溃测试入口</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 </head>
-<body style="text-align: center; padding-top: 50px; font-family: sans-serif;">
+<body style="text-align: center; padding-top: 50px; font-family: sans-serif; background: #f5f5f7;">
     <h2>Media Integrity 稳定性压测</h2>
-    <p>请确保当前浏览器支持该 API，点击下方按钮开始测试：</p>
-    <!-- 点击后会打开新窗口，新窗口就拥有了被 JS 关闭的权限 -->
-    <button onclick="startTest()" style="padding: 15px 30px; font-size: 18px; background: #007AFF; color: white; border: none; border-radius: 8px;">
-        🚀 点击开始一键压测
+    
+    <!-- 增加一个状态提示框 -->
+    <div id="env-check" style="margin: 20px auto; padding: 15px; max-width: 400px; border-radius: 8px; font-weight: bold;">
+        正在检测浏览器环境...
+    </div>
+
+    <button id="start-btn" onclick="startTest()" disabled style="padding: 15px 30px; font-size: 18px; background: #999; color: white; border: none; border-radius: 8px; cursor: not-allowed;">
+        🚀 开始一键压测
     </button>
 
     <script>
+        window.onload = function() {
+            const checkDiv = document.getElementById('env-check');
+            const btn = document.getElementById('start-btn');
+            
+            // 检查当前内置浏览器是否带有这个高危 API
+            if (window.navigator && window.navigator.getWebViewMediaIntegrityTokenProvider) {
+                checkDiv.style.background = "#d4edda";
+                checkDiv.style.color = "#155724";
+                checkDiv.innerHTML = "✓ 环境支持：当前浏览器已启用 Media Integrity API";
+                btn.disabled = false;
+                btn.style.background = "#007AFF";
+                btn.style.cursor = "pointer";
+            } else {
+                checkDiv.style.background = "#fff3cd";
+                checkDiv.style.color = "#856404";
+                checkDiv.innerHTML = "⚠️ 环境警告：当前浏览器未启用或不支持该 API，测试可能无法引发崩溃。";
+                // 依然允许点击，以防某些魔改版本隐藏了外层对象
+                btn.disabled = false;
+                btn.style.background = "#ff9500";
+                btn.style.cursor = "pointer";
+            }
+        };
+
         function startTest() {
-            // 打开同目录下的触发页面
             window.open('trigger.html', '_blank');
         }
     </script>
