@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Media Integrity </title>
+    <title>Media Integrity 终极测试</title>
     <style>
         body { font-family: sans-serif; padding: 20px; background: #1a1a1a; color: #fff; text-align: center; }
         .card { background: #2a2a2a; padding: 25px; border-radius: 16px; max-width: 500px; margin: 40px auto; box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
@@ -19,9 +19,9 @@
 
     <div class="card">
         <h2>🛡️ Media Integrity 链路测试</h2>
-        <p style="color: #aaa; font-size: 13px;">当前处于安全的 HTTPS 环境，已通过 C++ 层的 Origin 安全校验</p>
+        <p style="color: #aaa; font-size: 13px;">Mojom 规范版 (HTTPS 环境)</p>
         
-        <div id="scanResult" class="status-box">正在全网扫描 API 挂载点...</div>
+        <div id="scanResult" class="status-box">正在检测 window.android.webview ...</div>
         
         <button id="fireBtn" disabled>🔥 发射正牌 Mojo 请求</button>
         
@@ -38,57 +38,41 @@
             logEl.scrollTop = logEl.scrollHeight;
         }
 
-        // 1. 动态探针：扫描所有可能的挂载命名空间
-        let targetApi = null;
-        let apiPathName = "";
+        // 1. 严格按照 Mojom 约定的命名空间进行校验
+        const hasApi = window.android && 
+                      window.android.webview && 
+                      typeof window.android.webview.getExperimentalMediaIntegrityTokenProvider === 'function';
 
-        const possiblePaths = [
-            { name: "window.androidWebView", obj: window.androidWebView },
-            { name: "navigator.webview", obj: navigator.webview },
-            { name: "navigator", obj: navigator },
-            { name: "window", obj: window }
-        ];
-
-        printLog("开始扫描 getExperimentalMediaIntegrityTokenProvider...");
-
-        for (let path of possiblePaths) {
-            if (path.obj && typeof path.obj.getExperimentalMediaIntegrityTokenProvider === 'function') {
-                targetApi = path.obj.getExperimentalMediaIntegrityTokenProvider.bind(path.obj);
-                apiPathName = path.name;
-                break;
-            }
-        }
-
-        // 2. 根据扫描结果更新 UI 状态
-        if (targetApi) {
+        if (hasApi) {
             scanResultEl.className = "status-box found";
-            scanResultEl.innerHTML = `🎯 成功捕获 API！<br>挂载路径: <strong>${apiPathName}.getExperimentalMediaIntegrityTokenProvider</strong>`;
+            scanResultEl.innerHTML = `🎯 成功捕获 API！<br>路径: <strong>window.android.webview.getExperimentalMediaIntegrityTokenProvider</strong>`;
             fireBtn.disabled = false;
-            printLog(`环境就绪，API 来源于: ${apiPathName}`);
+            printLog("Mojom 接口验证成功，环境就绪。");
         } else {
             scanResultEl.className = "status-box not-found";
-            scanResultEl.innerHTML = `❌ 未在这个 WebView 内核中发现该实验性 API。<br>请确认系统内核是否开启了 MediaIntegrity 相关的 Feature Flag。`;
-            printLog("错误：所有命名空间均未找到该函数。");
+            scanResultEl.innerHTML = `❌ 未找到接口。<br>请确认内核是否开启了 WebViewMediaIntegrity 的 Feature 开关。`;
+            printLog("错误：未找到 window.android.webview 对象或方法。");
         }
 
-        // 3. 核心触发逻辑：完美对齐 C++ 层的结构体入参
+        // 2. 触发 Mojo 通信
         fireBtn.onclick = function() {
-            if (!targetApi) return;
+            if (!hasApi) return;
 
-            printLog("正在组装参数并拉起 Mojo 管道...");
+            printLog("正在组装参数并通过 Mojo 管道投递...");
             
-            // 严格对齐 params->cloudProjectNumber()，传入标准的 64 位内正整数
+            // 严格对齐 uint64 kMaxCloudProjectNumber 限制
             const testParams = {
                 cloudProjectNumber: 123456789 
             };
 
-            targetApi(testParams).then(function(provider) {
-                printLog("🎉 【通了！】Java 层成功创建并返回了 Provider。");
-                alert("请求已圆满走完 Java 流程！");
+            window.android.webview.getExperimentalMediaIntegrityTokenProvider(testParams)
+            .then(function(provider) {
+                printLog("🎉 Java 层处理成功并返回！");
+                alert("Mojo 通道已调通！");
             }).catch(function(err) {
-                // 即便走到这里，也说明 IPC 已经成功打进了 AwMediaIntegrityServiceImpl
-                printLog(`⚠️ IPC 已送达，Java 层已处理完毕（返回结果: ${err.name || err}）`);
-                alert("请求已成功送达 Java 内部，请在 Logcat 查看高频日志！");
+                // 只要 IPC 到了 Java 层，不管证书合不合规，我们的调用目的都达到了
+                printLog(`⚠️ IPC 已送达 Java 层（响应结果: ${err.name || err}）`);
+                alert("请求已砸进 Java 层，请去查看 Logcat！");
             });
         };
     </script>
