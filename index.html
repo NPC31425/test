@@ -2,46 +2,21 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
+    <title>Media Integrity 崩溃测试入口</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WebView UAF 稳定性压测 (手动版)</title>
-    <style>
-        body { font-family: -apple-system, sans-serif; text-align: center; padding: 40px 20px; background: #fafafa; color: #333; }
-        .card { max-width: 500px; margin: 0 auto; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 16px rgba(0,0,0,0.08); }
-        .btn { padding: 16px 32px; font-size: 18px; font-weight: bold; color: white; background: #007aff; border: none; border-radius: 8px; cursor: pointer; transition: background 0.2s; width: 100%; }
-        .btn:hover { background: #0056b3; }
-        .steps { text-align: left; margin-top: 25px; background: #f5f5f7; padding: 15px; border-radius: 8px; font-size: 14px; line-height: 1.6; }
-        .warning { color: #ff3b30; font-weight: bold; }
-    </style>
 </head>
-<body>
-
-    <div class="card">
-        <h2>🛸 WebView 媒体权限申请</h2>
-        <p>本测试专门用于复现 UAF 闪退</p>
-        
-        <button class="btn" onclick="triggerManualAttack()">1. 点击开始测试</button>
-        
-        <div class="steps">
-            <strong>🎯 完美复现操作指南：</strong><br>
-            1. 点击上方蓝色按钮。<br>
-            2. 屏幕上会弹出 WebView 原生的“允许拍摄视频和录制音频”弹窗。<br>
-            3. <span class="warning">关键点：请点击“允许”或“仅在使用中允许”。</span><br>
-            4. 观察 App 是否在点击的瞬间轰然闪退。
-        </div>
-    </div>
+<body style="text-align: center; padding-top: 50px; font-family: sans-serif;">
+    <h2>Media Integrity 稳定性压测</h2>
+    <p>请确保当前浏览器支持该 API，点击下方按钮开始测试：</p>
+    <!-- 点击后会打开新窗口，新窗口就拥有了被 JS 关闭的权限 -->
+    <button onclick="startTest()" style="padding: 15px 30px; font-size: 18px; background: #007AFF; color: white; border: none; border-radius: 8px;">
+        🚀 点击开始一键压测
+    </button>
 
     <script>
-        function triggerManualAttack() {
-            console.log("开始向内核队列注入 30 个并发权限请求...");
-            
-            // 核心伏笔：一口气往内核的 PermissionRequestManager 里塞入 30 个任务
-            // 此时底层会生成 30 个 MediaAccessPermissionRequest 对象
-            for (let i = 0; i < 1; i++) {
-                navigator.mediaDevices.getUserMedia({ audio: true, video: true })
-                .catch(err => {
-                    console.log("请求被拒绝或取消");
-                });
-            }
+        function startTest() {
+            // 打开同目录下的触发页面
+            window.open('trigger.html', '_blank');
         }
     </script>
 </body>
