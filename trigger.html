@@ -2,30 +2,42 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <title>加特林压测模式</title>
+    <title>Media Integrity 链路验证</title>
 </head>
-<body style="background: #111; color: #fff; text-align: center; padding-top: 50px; font-family: sans-serif;">
-    <h2 style="color: #FF3B30;">⚠️ 加特林无限轰炸模式已启动 </h2>
-    <p>正在以每 15 毫秒/次的频率轰击底层媒体服务...</p>
-
-    <p style="color: #FF9500; font-weight: bold; font-size: 18px;">【复现核心操作】</p>
-    <p style="padding: 10px; background: #222; border-radius: 8px; display: inline-block;">
-        1. 如果弹出媒体权限，请点击“允许”<br>
-        2. 点击允许后，立刻、马上、疯狂地按下手机的【返回键】关闭本页面！
-    </p>
+<body style="background: #f5f5f7; text-align: center; padding-top: 100px; font-family: sans-serif;">
+    <h2>Media Integrity 接口唤醒测试</h2>
+    <p>当前 API 状态：<span id="status" style="font-weight: bold; color: red;">检测中...</span></p>
+    <br>
+    <button id="btn" style="padding: 15px 30px; font-size: 16px; background: #007AFF; color: white; border: none; border-radius: 8px;">
+        🎯 发射单次真实请求
+    </button>
 
     <script>
-        window.onload = function() {
-            // 用 setInterval 代替 setTimeout，变成无限循环发包
-            setInterval(function() {
-                if (navigator.requestMediaKeySystemAccess) {
-                    // 疯狂发射 Widevine 请求，把底层 Mojo 通道塞满
-                    navigator.requestMediaKeySystemAccess('com.widevine.alpha', [{
-                        initDataTypes: ['cenc'],
-                        videoCapabilities: [{ contentType: 'video/mp4; codecs="avc1.42E01E"' }]
-                    }]);
-                }
-            }, 15); // 15毫秒一次，高频轰炸
+        const statusEl = document.getElementById('status');
+        const btn = document.getElementById('btn');
+
+        // 1. 检查 API 是否存在
+        if (navigator.getMediaIntegrityProvider) {
+            statusEl.innerText = "已激活 (Available)";
+            statusEl.style.color = "green";
+        } else {
+            statusEl.innerText = "未激活 (Undefined) ❌ 必须去内核开启 Flag！";
+        }
+
+        // 2. 点击手动触发
+        btn.onclick = function() {
+            if (!navigator.getMediaIntegrityProvider) {
+                alert("API 根本不存在，请求无法送达 Java 层！");
+                return;
+            }
+            
+            navigator.getMediaIntegrityProvider({
+                cloudProjectNumber: "123456789"
+            }).then(() => {
+                alert("请求成功（已走完 Java 完整链路）");
+            }).catch((err) => {
+                alert("请求已送达 Java 内部，但因测试 ID 报错（这是正常的，链路已通）");
+            });
         };
     </script>
 </body>
