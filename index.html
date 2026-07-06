@@ -7,10 +7,11 @@
 </head>
 <body style="text-align: center; padding-top: 100px; font-family: sans-serif; background: #f5f5f7;">
     <h2>Media Integrity 异步生命周期压测</h2>
-    <p style="color: #666;">测试原理：通过标准 DRM 隐式唤醒底层服务，并在 60ms 内强行销毁窗口。</p>
+    <p style="color: #666;">测试原理：同窗口加载 DRM 轰炸页，手动强制销毁 Tab 触发撞车。</p>
     <br>
-    <button onclick="window.open('trigger.html', '_blank')" style="padding: 15px 30px; font-size: 18px; background: #007AFF; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold;">
-        🚀 发动极限压测
+    <!-- 改为原地跳转，确保使用当前主 WebView 容器 -->
+    <button onclick="window.location.href='trigger.html'" style="padding: 15px 30px; font-size: 18px; background: #FF3B30; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold;">
+        🚀 发动原地极限压测
     </button>
 </body>
 </html>
