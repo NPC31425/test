@@ -3,22 +3,38 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FFmpegDemuxer OnDataSourceError Test</title>
+    <title>FFmpegDemuxer 测试控制台</title>
     <style>
-        body { font-family: sans-serif; padding: 20px; line-height: 1.5; }
-        #status { font-weight: bold; margin-bottom: 15px; padding: 12px; border-radius: 6px; background: #f0f0f0; }
-        video { width: 100%; max-width: 480px; display: block; margin-top: 15px; border: 1px solid #ccc; border-radius: 4px; }
-        .log-box { font-family: monospace; font-size: 13px; background: #1e1e1e; color: #00ff00; padding: 12px; border-radius: 6px; max-height: 250px; overflow-y: auto; margin-top: 15px; }
+        body { font-family: system-ui, -apple-system, sans-serif; padding: 20px; line-height: 1.5; max-width: 600px; margin: 0 auto; background: #f8fafc; }
+        .card { background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); margin-bottom: 16px; border: 1px solid #e2e8f0; }
+        #status { font-weight: bold; padding: 12px; border-radius: 6px; background: #f1f5f9; margin-bottom: 16px; color: #334155; text-align: center; }
+        .btn-group { display: flex; gap: 12px; margin-bottom: 16px; }
+        button { flex: 1; padding: 12px; font-size: 14px; font-weight: bold; border: none; border-radius: 6px; cursor: pointer; transition: opacity 0.2s; }
+        button:active { opacity: 0.8; }
+        .btn-primary { background: #2563eb; color: white; }
+        .btn-danger { background: #dc2626; color: white; }
+        video { width: 100%; border-radius: 6px; background: #000; display: block; margin-top: 10px; }
+        .log-box { font-family: monospace; font-size: 12px; background: #0f172a; color: #38edf8; padding: 12px; border-radius: 6px; max-height: 220px; overflow-y: auto; }
     </style>
 </head>
 <body>
-    <h2>FFmpegDemuxer::OnDataSourceError 测试</h2>
-    <div id="status">正在注册 Service Worker...</div>
-    
-    <div id="videoContainer"></div>
-    
-    <h3>页面运行日志：</h3>
-    <div id="log" class="log-box"></div>
+    <h2>Demuxer 报错触发控制台</h2>
+
+    <div class="card">
+        <div id="status">正在初始化 Service Worker...</div>
+        
+        <div class="btn-group">
+            <button class="btn-primary" onclick="playVideo(false)">▶️ 正常播放</button>
+            <button class="btn-danger" onclick="playVideo(true)">💥 模拟中断报错</button>
+        </div>
+
+        <div id="videoContainer"></div>
+    </div>
+
+    <div class="card">
+        <h3>运行日志：</h3>
+        <div id="log" class="log-box"></div>
+    </div>
 
     <script>
         function log(msg) {
@@ -28,51 +44,73 @@
             logBox.scrollTop = logBox.scrollHeight;
         }
 
-        function setStatus(text, bg) {
+        function setStatus(text, bg, color = '#000') {
             const el = document.getElementById('status');
             el.innerText = text;
             el.style.backgroundColor = bg;
+            el.style.color = color;
         }
 
+        // 注册 Service Worker
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('./sw.js')
                 .then((reg) => {
                     log('Service Worker 注册成功');
-                    
                     navigator.serviceWorker.ready.then(() => {
                         if (!navigator.serviceWorker.controller) {
-                            log('激活 Service Worker 并刷新页面以接管控制权...');
+                            log('激活 Service Worker，刷新页面以接管控制权...');
                             window.location.reload();
                             return;
                         }
-                        setStatus('SW 就绪，开始拉取视频...', '#d4edda');
-                        loadVideo();
+                        setStatus('✅ SW 已就绪，请选择测试模式', '#dcfce7', '#166534');
                     });
                 })
                 .catch((err) => {
                     log('SW 注册失败: ' + err);
-                    setStatus('Service Worker 注册失败', '#f8d7da');
+                    setStatus('❌ Service Worker 注册失败', '#fee2e2', '#991b1b');
                 });
         } else {
-          setStatus('当前环境不支持 Service Worker', '#f8d7da');
+            setStatus('❌ 当前环境不支持 Service Worker', '#fee2e2', '#991b1b');
         }
 
-        function loadVideo() {
+        function playVideo(shouldError) {
             const container = document.getElementById('videoContainer');
+            container.innerHTML = ''; // 清空先前的视频容器
+
             const video = document.createElement('video');
             video.controls = true;
             video.autoplay = true;
             video.playsInline = true;
-            video.src = './mock_video.mp4';
+            
+            // 加上时间戳防止 WebView 的 HTTP 强缓存干扰测试
+            const timestamp = Date.now();
+            const targetUrl = shouldError 
+                ? `./mock_video.mp4?error=true&t=${timestamp}` 
+                : `./mock_video.mp4?t=${timestamp}`;
 
-            video.onplay = () => log('视频启动播放（说明 Demuxer 已成功初始化 Header）');
+            video.src = targetUrl;
+
+            if (shouldError) {
+                log('▶️ 请求：./mock_video.mp4?error=true（预定 100KB 断流）');
+                setStatus('⏳ 加载中，准备触发断流报错...', '#fef3c7', '#92400e');
+            } else {
+                log('▶️ 请求：./mock_video.mp4（正常播放）');
+                setStatus('⏳ 正在正常加载视频...', '#e0f2fe', '#075985');
+            }
+
+            video.onplay = () => log('🎬 <video> 收到 Header 并开始播放');
+            
             video.onerror = () => {
-                log('HTML5 <video> 捕获到播放中断错误！');
-                setStatus('数据流被中断，已触发底层播放异常！', '#f8d7da');
+                log('❌ <video> 捕获到播放错误');
+                setStatus('💥 数据流已切断！OnDataSourceError 已触发', '#fee2e2', '#991b1b');
+            };
+
+            video.onended = () => {
+                log('✅ 视频完整播放完毕');
+                setStatus('✅ 正常播放完成', '#dcfce7', '#166534');
             };
 
             container.appendChild(video);
-            log('挂载 <video> 标签并请求 ./mock_video.mp4');
         }
     </script>
 </body>
