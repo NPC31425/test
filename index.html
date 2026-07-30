@@ -1,19 +1,79 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-    <meta charset="UTF-8">
+    <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>控制台落地页</title>
+    <title>FFmpegDemuxer OnDataSourceError Test</title>
     <style>
-        body { font-family: sans-serif; background: #121212; color: #fff; text-align: center; padding-top: 100px; }
-        .btn { padding: 15px 35px; font-size: 16px; background: #007AFF; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; }
+        body { font-family: sans-serif; padding: 20px; line-height: 1.5; }
+        #status { font-weight: bold; margin-bottom: 15px; padding: 12px; border-radius: 6px; background: #f0f0f0; }
+        video { width: 100%; max-width: 480px; display: block; margin-top: 15px; border: 1px solid #ccc; border-radius: 4px; }
+        .log-box { font-family: monospace; font-size: 13px; background: #1e1e1e; color: #00ff00; padding: 12px; border-radius: 6px; max-height: 250px; overflow-y: auto; margin-top: 15px; }
     </style>
 </head>
 <body>
-    <h2>Media Integrity 自动撞车测试</h2>
-    <p style="color: #aaa;">点击下方按钮将打开新 Tab 并立即开始加特林轰炸</p>
-    <br>
-    <!-- 🎯 核心：通过新窗口打开，赋予新页面 window.close() 的特权 -->
-    <button class="btn" onclick="window.open('trigger.html', '_blank')">🚀 弹射新 Tab 并开轰</button>
+    <h2>FFmpegDemuxer::OnDataSourceError 测试</h2>
+    <div id="status">正在注册 Service Worker...</div>
+    
+    <div id="videoContainer"></div>
+    
+    <h3>页面运行日志：</h3>
+    <div id="log" class="log-box"></div>
+
+    <script>
+        function log(msg) {
+            const logBox = document.getElementById('log');
+            const time = new Date().toLocaleTimeString();
+            logBox.innerHTML += `[${time}] ${msg}<br>`;
+            logBox.scrollTop = logBox.scrollHeight;
+        }
+
+        function setStatus(text, bg) {
+            const el = document.getElementById('status');
+            el.innerText = text;
+            el.style.backgroundColor = bg;
+        }
+
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('./sw.js')
+                .then((reg) => {
+                    log('Service Worker 注册成功');
+                    
+                    navigator.serviceWorker.ready.then(() => {
+                        if (!navigator.serviceWorker.controller) {
+                            log('激活 Service Worker 并刷新页面以接管控制权...');
+                            window.location.reload();
+                            return;
+                        }
+                        setStatus('SW 就绪，开始拉取视频...', '#d4edda');
+                        loadVideo();
+                    });
+                })
+                .catch((err) => {
+                    log('SW 注册失败: ' + err);
+                    setStatus('Service Worker 注册失败', '#f8d7da');
+                });
+        } else {
+          setStatus('当前环境不支持 Service Worker', '#f8d7da');
+        }
+
+        function loadVideo() {
+            const container = document.getElementById('videoContainer');
+            const video = document.createElement('video');
+            video.controls = true;
+            video.autoplay = true;
+            video.playsInline = true;
+            video.src = './mock_video.mp4';
+
+            video.onplay = () => log('视频启动播放（说明 Demuxer 已成功初始化 Header）');
+            video.onerror = () => {
+                log('HTML5 <video> 捕获到播放中断错误！');
+                setStatus('数据流被中断，已触发底层播放异常！', '#f8d7da');
+            };
+
+            container.appendChild(video);
+            log('挂载 <video> 标签并请求 ./mock_video.mp4');
+        }
+    </script>
 </body>
 </html>
