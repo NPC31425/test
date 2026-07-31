@@ -23,7 +23,7 @@ self.addEventListener('fetch', (event) => {
                 // 随后在读取后续 Video Frame 时强行中断，精准触发 host_->OnDemuxerError(PIPELINE_ERROR_READ)！
                 const reader = response.body.getReader();
                 let bytesRead = 0;
-                const cutoffBytes = 512 * 1024; // 512KB
+                const cutoffBytes = 2048 * 1024;
 
                 const faultyStream = new ReadableStream({
                     start(controller) {
