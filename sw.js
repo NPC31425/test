@@ -1,4 +1,4 @@
-// 确保 SW 快速更新接管页面
+// 快速跳过等待并接管控制权
 self.addEventListener('install', (event) => {
     self.skipWaiting();
 });
@@ -9,8 +9,8 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('fetch', (event) => {
     if (event.request.url.includes('mock_video.webm')) {
-        // 使用支持 CORS 的 WebM 视频源（全平台兼容，完美走 FFmpeg 管线）
-        const testVideoUrl = 'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.webm';
+        // 使用维基共享资源的 Big Buck Bunny VP9 WebM 测试视频（兼容性与 CORS 完美支持）
+        const testVideoUrl = 'https://upload.wikimedia.org/wikipedia/commons/transcoded/c/c0/Big_Buck_Bunny_4K_H264_30fps.mp4/Big_Buck_Bunny_4K_H264_30fps.mp4.480p.vp9.webm';
         const shouldSimulateError = event.request.url.includes('error=true');
 
         event.respondWith(
@@ -19,11 +19,14 @@ self.addEventListener('fetch', (event) => {
                     return response;
                 }
 
-                // 💡 关键机制：先放行前 512KB 字节，确保 FFmpegDemuxer 成功完成 Header 解析并进入播放状态。
-                // 随后在读取后续 Video Frame 时强行中断，精准触发 host_->OnDemuxerError(PIPELINE_ERROR_READ)！
+                // 💡 1. 动态获取视频总大小，计算 50% 的断流位置
+                const contentLength = response.headers.get('content-length');
+                // 默认保底 2MB
+                const totalBytes = contentLength ? parseInt(contentLength, 10) : 2048 * 1024; 
+                const cutoffBytes = Math.floor(totalBytes * 0.5); // 播放到 50% 时精准切断
+
                 const reader = response.body.getReader();
                 let bytesRead = 0;
-                const cutoffBytes = 2048 * 1024;
 
                 const faultyStream = new ReadableStream({
                     start(controller) {
@@ -36,8 +39,8 @@ self.addEventListener('fetch', (event) => {
                                 bytesRead += value.byteLength;
 
                                 if (bytesRead >= cutoffBytes) {
-                                    // 模拟网络在播放中途突然断开 IO 管道
-                                    controller.error(new TypeError('Simulated Runtime Network Read Error'));
+                                    // 💡 在播放中途（50% 字节处）强行切断管道，触发 C++ PIPELINE_ERROR_READ
+                                    controller.error(new TypeError('Simulated Mid-Stream Network Error'));
                                     return;
                                 }
 
@@ -49,13 +52,16 @@ self.addEventListener('fetch', (event) => {
                     }
                 });
 
+                // 💡 2. 补全必要的 Header，防止 C++ 在 Initialize 阶段拒收格式
                 const newHeaders = new Headers(response.headers);
                 newHeaders.set('Access-Control-Allow-Origin', '*');
+                newHeaders.set('Content-Type', 'video/webm');
+                newHeaders.set('Accept-Ranges', 'bytes');
 
                 return new Response(faultyStream, {
-                    headers: newHeaders,
                     status: response.status,
-                    statusText: response.statusText
+                    statusText: response.statusText,
+                    headers: newHeaders
                 });
             })
         );
