@@ -8,21 +8,19 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-    // 拦截对虚拟视频地址的请求
     if (event.request.url.includes('mock_video.mp4')) {
-        const testVideoUrl = 'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.webm';
-        
-        // 检查请求中是否带有 error=true 参数
+        // 使用 MDN 官方支持 CORS 跨域的视频资源
+        const testVideoUrl = 'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4';
         const shouldSimulateError = event.request.url.includes('error=true');
 
         event.respondWith(
             fetch(testVideoUrl, { mode: 'cors' }).then((response) => {
-                // 如果是正常播放请求，直接透传完整视频流
+                // 正常播放请求直接透传
                 if (!shouldSimulateError) {
                     return response;
                 }
 
-                // 如果带有 error=true，读取 100KB 后切断 DataPipe 管道
+                // 带 error=true 时，读取满 100KB 后切断 DataPipe 管道
                 const reader = response.body.getReader();
                 let bytesRead = 0;
                 const maxBytes = 100 * 1024; // 100KB
@@ -38,7 +36,7 @@ self.addEventListener('fetch', (event) => {
                                 bytesRead += value.byteLength;
 
                                 if (bytesRead >= maxBytes) {
-                                    // 在流的中途主动触发错误，直接触发 C++ 层的 OnDataSourceError
+                                    // 在流的中途主动触发错误，直接传导给 C++ 层
                                     controller.error(new TypeError('Simulated Network IO Error'));
                                     return;
                                 }
