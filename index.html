@@ -72,7 +72,7 @@
                     log('Service Worker 注册成功');
                     navigator.serviceWorker.ready.then(() => {
                         if (!navigator.serviceWorker.controller) {
-                            log('正在刷新页面激活最新 SW...', 'error');
+                            log('正在刷新激活最新 SW...', 'error');
                             window.location.reload();
                             return;
                         }
@@ -81,7 +81,6 @@
                 })
                 .catch((err) => {
                     log('SW 注册失败: ' + err, 'error');
-                    setStatus('❌ Service Worker 注册失败', '#fee2e2', '#991b1b');
                 });
         }
 
@@ -113,7 +112,7 @@
                     log(`🎯 验证成功！Code 2 (MEDIA_ERR_NETWORK) 精准对应 C++ PIPELINE_ERROR_READ！`, 'success');
                     setStatus('💥 成功捕获到 C++ OnDemuxerError(PIPELINE_ERROR_READ) 抛出的断流错误！', '#fee2e2', '#991b1b');
                 } else {
-                    log(`⚠️ 捕获到 Error Code: ${err.code}`, 'error');
+                    log(`⚠️ 捕获到错误 Code: ${err.code}`, 'error');
                 }
 
                 if (err.message) {
@@ -131,10 +130,10 @@
                 : `./mock_video.webm?t=${timestamp}`;
 
             if (shouldError) {
-                log('▶️ 开始播放测试（发送 250KB 数据起播后 1 秒强行断流）');
+                log('▶️ 开始测试（裁切只给 150KB 数据，起播后 1 秒强行闭关管道）');
                 setStatus('⏳ 正在播放，等待 1 秒后触发 C++ 断流...', '#fef3c7', '#92400e');
             } else {
-                log('▶️ 开始播放测试（正常全量流程）');
+                log('▶️ 开始测试（正常全量流程）');
                 setStatus('⏳ 正在加载正常视频...', '#e0f2fe', '#075985');
             }
 
