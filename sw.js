@@ -10,7 +10,7 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
     if (event.request.url.includes('mock_video.mp4')) {
         // 使用 MDN 官方支持 CORS 跨域的视频资源
-        const testVideoUrl = 'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.ogv';
+        const testVideoUrl = 'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.webm';
         const shouldSimulateError = event.request.url.includes('error=true');
 
         event.respondWith(
