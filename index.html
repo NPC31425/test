@@ -3,14 +3,13 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FFmpegDemuxer 运行时报错测试</title>
+    <title>FFmpegDemuxer PIPELINE_ERROR_READ 测试</title>
     <style>
         body { font-family: system-ui, -apple-system, sans-serif; padding: 20px; line-height: 1.5; max-width: 650px; margin: 0 auto; background: #f8fafc; }
         .card { background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); margin-bottom: 16px; border: 1px solid #e2e8f0; }
         #status { font-weight: bold; padding: 12px; border-radius: 6px; background: #f1f5f9; margin-bottom: 16px; color: #334155; text-align: center; }
         .btn-group { display: flex; gap: 12px; margin-bottom: 16px; }
-        button { flex: 1; padding: 12px; font-size: 14px; font-weight: bold; border: none; border-radius: 6px; cursor: pointer; transition: opacity 0.2s; }
-        button:active { opacity: 0.8; }
+        button { flex: 1; padding: 12px; font-size: 14px; font-weight: bold; border: none; border-radius: 6px; cursor: pointer; }
         .btn-primary { background: #2563eb; color: white; }
         .btn-danger { background: #dc2626; color: white; }
         video { width: 100%; border-radius: 6px; background: #000; display: block; margin-top: 10px; }
@@ -20,7 +19,7 @@
     </style>
 </head>
 <body>
-    <h2>FFmpegDemuxer PIPELINE_ERROR_READ 验证</h2>
+    <h2>FFmpegDemuxer 运行时断流验证</h2>
 
     <div class="card">
         <div id="status">正在准备 Service Worker 环境...</div>
@@ -67,18 +66,17 @@
             return audioCtx;
         }
 
-        // 注册 Service Worker
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('./sw.js')
                 .then((reg) => {
                     log('Service Worker 注册成功');
                     navigator.serviceWorker.ready.then(() => {
                         if (!navigator.serviceWorker.controller) {
-                            log('SW 首次注册，正在自动刷新页面激活...', 'error');
+                            log('正在刷新页面以激活最新 SW...', 'error');
                             window.location.reload();
                             return;
                         }
-                        setStatus('✅ 环境准备就绪 (SW 已接管网络请求)', '#dcfce7', '#166534');
+                        setStatus('✅ 环境准备就绪', '#dcfce7', '#166534');
                     });
                 })
                 .catch((err) => {
@@ -96,29 +94,28 @@
             video.autoplay = true;
             video.playsInline = true;
 
-            // 💡 关键点 1：必须设置 crossOrigin，防止 WebAudio 触发 CORS 安全限制导致 Code 4 错误
+            // 设置 CORS
             video.crossOrigin = 'anonymous';
 
-            // 💡 关键点 2：绑定 WebAudio，强行逼迫 Android WebView 启用 C++ FFmpeg 管线
+            // 绑定 WebAudio 逼迫 Chromium 走 FFmpegDemuxer
             try {
                 const ctx = getAudioContext();
                 const source = ctx.createMediaElementSource(video);
                 source.connect(ctx.destination);
-                log('💡 已接入 WebAudio，强行诱导 Chromium 启用 C++ FFmpegDemuxer');
+                log('💡 已接入 WebAudio，成功诱导 Chromium 启用 FFmpeg 管线');
             } catch (e) {
-                log('⚠️ WebAudio 接入提示: ' + e.message);
+                log('⚠️ WebAudio 提示: ' + e.message);
             }
 
-            // 💡 关键点 3：捕获 C++ 抛出的 MediaError
             video.onerror = () => {
                 const err = video.error;
-                log(`❌ [捕获到 HTML5 MediaError] Error Code: ${err.code}`, 'error');
+                log(`❌ [捕获到 HTML5 MediaError] Code: ${err.code}`, 'error');
                 
                 if (err.code === 2) {
                     log(`🎯 验证成功！Code 2 (MEDIA_ERR_NETWORK) 精准对应 C++ PIPELINE_ERROR_READ！`, 'success');
                     setStatus('💥 成功捕获到 C++ OnDemuxerError(PIPELINE_ERROR_READ) 抛出的断流错误！', '#fee2e2', '#991b1b');
                 } else if (err.code === 4) {
-                    log(`⚠️ Code 4: 视频仍在 Header 初始化阶段被阻断，请检查网络/跨域`, 'error');
+                    log(`⚠️ 依然返回 Code 4，说明请求可能被 Android WebView 的网络策略/防火墙拦截`, 'error');
                 }
 
                 if (err.message) {
@@ -127,21 +124,19 @@
             };
 
             video.onplaying = () => {
-                log('🎬 视频开始播放，证明 FFmpegDemuxer 已成功通过 Initialize 进入 kReading 状态！', 'success');
+                log('🎬 视频已正常播放，FFmpegDemuxer 顺利完成 Header 解析进入 kReading 状态！', 'success');
             };
 
             const timestamp = Date.now();
-            const targetUrl = shouldError 
+            video.src = shouldError 
                 ? `./mock_video.webm?error=true&t=${timestamp}` 
                 : `./mock_video.webm?t=${timestamp}`;
 
-            video.src = targetUrl;
-
             if (shouldError) {
-                log('▶️ 开始测试：./mock_video.webm?error=true（视频将在播放到 50% 时模拟网络中断）');
-                setStatus('⏳ 正在播放，等待达到 50% 字节处触发 C++ 断流...', '#fef3c7', '#92400e');
+                log('▶️ 开始播放测试（视频将在播放到 50% 字节处强行中断网络）');
+                setStatus('⏳ 正在播放，等待读取达到 50% 时触发 C++ 断流...', '#fef3c7', '#92400e');
             } else {
-                log('▶️ 开始测试：./mock_video.webm（正常播放流程）');
+                log('▶️ 开始播放测试（正常全量流程）');
                 setStatus('⏳ 正在加载正常视频...', '#e0f2fe', '#075985');
             }
 
