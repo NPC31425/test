@@ -3,9 +3,9 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FFmpegDemuxer 强制触发测试</title>
+    <title>FFmpegDemuxer 错误抛出监控</title>
     <style>
-        body { font-family: system-ui, -apple-system, sans-serif; padding: 20px; line-height: 1.5; max-width: 600px; margin: 0 auto; background: #f8fafc; }
+        body { font-family: system-ui, -apple-system, sans-serif; padding: 20px; line-height: 1.5; max-width: 650px; margin: 0 auto; background: #f8fafc; }
         .card { background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); margin-bottom: 16px; border: 1px solid #e2e8f0; }
         #status { font-weight: bold; padding: 12px; border-radius: 6px; background: #f1f5f9; margin-bottom: 16px; color: #334155; text-align: center; }
         .btn-group { display: flex; gap: 12px; margin-bottom: 16px; }
@@ -14,33 +14,35 @@
         .btn-primary { background: #2563eb; color: white; }
         .btn-danger { background: #dc2626; color: white; }
         video { width: 100%; border-radius: 6px; background: #000; display: block; margin-top: 10px; }
-        .log-box { font-family: monospace; font-size: 12px; background: #0f172a; color: #38edf8; padding: 12px; border-radius: 6px; max-height: 220px; overflow-y: auto; }
+        .log-box { font-family: monospace; font-size: 12px; background: #0f172a; color: #38edf8; padding: 12px; border-radius: 6px; max-height: 250px; overflow-y: auto; white-space: pre-wrap; }
+        .err-highlight { color: #f87171; font-weight: bold; }
     </style>
 </head>
 <body>
-    <h2>FFmpegDemuxer 强制触发测试</h2>
+    <h2>FFmpegDemuxer 运行时报错监控</h2>
 
     <div class="card">
         <div id="status">正在初始化 Service Worker...</div>
         
         <div class="btn-group">
             <button class="btn-primary" onclick="playVideo(false)">▶️ 正常播放</button>
-            <button class="btn-danger" onclick="playVideo(true)">💥 触发 FFmpegDemuxer 报错</button>
+            <button class="btn-danger" onclick="playVideo(true)">💥 触发 OnDemuxerError</button>
         </div>
 
         <div id="videoContainer"></div>
     </div>
 
     <div class="card">
-        <h3>运行日志：</h3>
+        <h3>运行与 C++ 传递捕获日志：</h3>
         <div id="log" class="log-box"></div>
     </div>
 
     <script>
-        function log(msg) {
+        function log(msg, isError = false) {
             const logBox = document.getElementById('log');
             const time = new Date().toLocaleTimeString();
-            logBox.innerHTML += `[${time}] ${msg}<br>`;
+            const cssClass = isError ? 'class="err-highlight"' : '';
+            logBox.innerHTML += `<div ${cssClass}>[${time}] ${msg}</div>`;
             logBox.scrollTop = logBox.scrollHeight;
         }
 
@@ -51,7 +53,7 @@
             el.style.color = color;
         }
 
-        // 全局 AudioContext
+        // WebAudio 上下文
         let audioCtx = null;
         function getAudioContext() {
             if (!audioCtx) {
@@ -70,63 +72,72 @@
                     log('Service Worker 注册成功');
                     navigator.serviceWorker.ready.then(() => {
                         if (!navigator.serviceWorker.controller) {
-                            log('激活 Service Worker，刷新页面以接管控制权...');
+                            log('刷新页面以允许 SW 接管控制权...');
                             window.location.reload();
                             return;
                         }
-                        setStatus('✅ SW 已就绪，请选择测试模式', '#dcfce7', '#166534');
+                        setStatus('✅ 测试环境准备就绪', '#dcfce7', '#166534');
                     });
                 })
                 .catch((err) => {
-                    log('SW 注册失败: ' + err);
+                    log('SW 注册失败: ' + err, true);
                     setStatus('❌ Service Worker 注册失败', '#fee2e2', '#991b1b');
                 });
-        } else {
-            setStatus('❌ 当前环境不支持 Service Worker', '#fee2e2', '#991b1b');
         }
 
         function playVideo(shouldError) {
             const container = document.getElementById('videoContainer');
-            container.innerHTML = ''; // 清空先前的视频容器
+            container.innerHTML = ''; 
 
             const video = document.createElement('video');
             video.controls = true;
             video.autoplay = true;
             video.playsInline = true;
 
-            // 💡 关键核心黑科技：绑定到 WebAudio 图谱
-            // 只要把 video 挂载到 AudioContext，Chromium 在 Android 上就会强制放弃
-            // 系统原生 MediaUrlDemuxer 托管，转而 100% 实例化 C++ 层的 FFmpegDemuxer！
+            // 💡 1. 强行接入 WebAudio，迫使 Chromium 创建 C++ FFmpegDemuxer 实例
             try {
                 const ctx = getAudioContext();
                 const source = ctx.createMediaElementSource(video);
                 source.connect(ctx.destination);
-                log('💡 已成功接入 WebAudio，强行逼迫 Chromium 启用 FFmpegDemuxer');
+                log('💡 已接入 WebAudio，已成功诱导 Chromium 启用 FFmpeg 管线');
             } catch (e) {
-                log('⚠️ WebAudio 绑定失败: ' + e.message);
+                log('⚠️ WebAudio 接入提示: ' + e.message);
             }
-            
+
+            // 💡 2. 监听 C++ 层传回的 MediaError 错误
+            video.onerror = () => {
+                const err = video.error;
+                log(`❌ [捕获到 HTML5 MediaError] Code: ${err.code}`, true);
+                
+                if (err.code === 2) { // MEDIA_ERR_NETWORK
+                    log(`🎯 完美确认：Code 2 (MEDIA_ERR_NETWORK) 对应 C++ 底层 PIPELINE_ERROR_READ！`, true);
+                }
+
+                if (err.message) {
+                    log(`📝 C++ MEDIA_LOG 抛出的详细文字: "${err.message}"`, true);
+                }
+
+                setStatus('💥 成功捕获到 C++ OnDemuxerError 抛出的错误！', '#fee2e2', '#991b1b');
+            };
+
+            video.onplaying = () => {
+                log('🎬 视频 Header 解析成功，FFmpegDemuxer 已进入 kReading 播放状态');
+            };
+
             const timestamp = Date.now();
             const targetUrl = shouldError 
-                ? `./mock_video.mp4?error=true&t=${timestamp}` 
-                : `./mock_video.mp4?t=${timestamp}`;
+                ? `./mock_video.webm?error=true&t=${timestamp}` 
+                : `./mock_video.webm?t=${timestamp}`;
 
             video.src = targetUrl;
 
             if (shouldError) {
-                log('▶️ 请求：./mock_video.mp4?error=true（预定 100KB 断流）');
-                setStatus('⏳ 准备切断数据流，等待触发 Demuxer 报错...', '#fef3c7', '#92400e');
+                log('▶️ 开始播放：./mock_video.webm?error=true（已预设 512KB 后的中途断流）');
+                setStatus('⏳ 正在播放，等待读取到达 512KB 时触发 C++ 断流...', '#fef3c7', '#92400e');
             } else {
-                log('▶️ 请求：./mock_video.mp4（正常播放）');
-                setStatus('⏳ 正在正常加载视频...', '#e0f2fe', '#075985');
+                log('▶️ 开始播放：./mock_video.webm（正常全流程）');
+                setStatus('⏳ 正在加载正常视频...', '#e0f2fe', '#075985');
             }
-
-            video.onplay = () => log('🎬 <video> 收到 Header 并开始播放');
-            
-            video.onerror = () => {
-                log('❌ <video> 捕获到播放错误');
-                setStatus('💥 数据流已切断！C++ FFmpegDemuxer 已触发错误处理', '#fee2e2', '#991b1b');
-            };
 
             container.appendChild(video);
         }
