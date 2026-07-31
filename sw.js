@@ -10,7 +10,7 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
     // 拦截对虚拟视频地址的请求
     if (event.request.url.includes('mock_video.mp4')) {
-        const testVideoUrl = 'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4';
+        const testVideoUrl = 'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.webm';
         
         // 检查请求中是否带有 error=true 参数
         const shouldSimulateError = event.request.url.includes('error=true');
