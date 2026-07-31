@@ -1,4 +1,4 @@
-// 确保 Service Worker 立即更新并接管页面
+// 确保 SW 快速更新接管页面
 self.addEventListener('install', (event) => {
     self.skipWaiting();
 });
@@ -8,22 +8,22 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-    if (event.request.url.includes('mock_video.mp4')) {
-        // 使用 MDN 官方支持 CORS 跨域的视频资源
+    if (event.request.url.includes('mock_video.webm')) {
+        // 使用支持 CORS 的 WebM 视频源（全平台兼容，完美走 FFmpeg 管线）
         const testVideoUrl = 'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.webm';
         const shouldSimulateError = event.request.url.includes('error=true');
 
         event.respondWith(
             fetch(testVideoUrl, { mode: 'cors' }).then((response) => {
-                // 正常播放请求直接透传
                 if (!shouldSimulateError) {
                     return response;
                 }
 
-                // 带 error=true 时，读取满 100KB 后切断 DataPipe 管道
+                // 💡 关键机制：先放行前 512KB 字节，确保 FFmpegDemuxer 成功完成 Header 解析并进入播放状态。
+                // 随后在读取后续 Video Frame 时强行中断，精准触发 host_->OnDemuxerError(PIPELINE_ERROR_READ)！
                 const reader = response.body.getReader();
                 let bytesRead = 0;
-                const maxBytes = 100 * 1024; // 100KB
+                const cutoffBytes = 512 * 1024; // 512KB
 
                 const faultyStream = new ReadableStream({
                     start(controller) {
@@ -35,9 +35,9 @@ self.addEventListener('fetch', (event) => {
                                 }
                                 bytesRead += value.byteLength;
 
-                                if (bytesRead >= maxBytes) {
-                                    // 在流的中途主动触发错误，直接传导给 C++ 层
-                                    controller.error(new TypeError('Simulated Network IO Error'));
+                                if (bytesRead >= cutoffBytes) {
+                                    // 模拟网络在播放中途突然断开 IO 管道
+                                    controller.error(new TypeError('Simulated Runtime Network Read Error'));
                                     return;
                                 }
 
