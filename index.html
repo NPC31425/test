@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FFmpegDemuxer PIPELINE_ERROR_READ 测试</title>
+    <title>FFmpegDemuxer PIPELINE_ERROR_READ 验证</title>
     <style>
         body { font-family: system-ui, -apple-system, sans-serif; padding: 20px; line-height: 1.5; max-width: 650px; margin: 0 auto; background: #f8fafc; }
         .card { background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); margin-bottom: 16px; border: 1px solid #e2e8f0; }
@@ -33,7 +33,7 @@
     </div>
 
     <div class="card">
-        <h3>运行与 C++ 错误抛出日志：</h3>
+        <h3>运行与 C++ 报错日志：</h3>
         <div id="log" class="log-box"></div>
     </div>
 
@@ -95,7 +95,7 @@
             video.playsInline = true;
             video.crossOrigin = 'anonymous';
 
-            // 绑定 WebAudio 逼迫 Chromium 走 FFmpegDemuxer
+            // 绑定 WebAudio 逼迫 Chromium 启用 C++ FFmpegDemuxer
             try {
                 const ctx = getAudioContext();
                 const source = ctx.createMediaElementSource(video);
@@ -107,13 +107,13 @@
 
             video.onerror = () => {
                 const err = video.error;
-                log(`❌ [捕获到 HTML5 MediaError] Error Code: ${err.code}`, 'error');
+                log(`❌ [捕获到 HTML5 MediaError] Code: ${err.code}`, 'error');
                 
                 if (err.code === 2) {
                     log(`🎯 验证成功！Code 2 (MEDIA_ERR_NETWORK) 精准对应 C++ PIPELINE_ERROR_READ！`, 'success');
                     setStatus('💥 成功捕获到 C++ OnDemuxerError(PIPELINE_ERROR_READ) 抛出的断流错误！', '#fee2e2', '#991b1b');
-                } else if (err.code === 4) {
-                    log(`⚠️ Code 4: 说明视频在 Initialize 阶段被断流，请确认 SW 已更新`, 'error');
+                } else {
+                    log(`⚠️ 捕获到 Error Code: ${err.code}`, 'error');
                 }
 
                 if (err.message) {
@@ -131,8 +131,8 @@
                 : `./mock_video.webm?t=${timestamp}`;
 
             if (shouldError) {
-                log('▶️ 开始播放测试（视频将在播放到 85% 字节处强行中断网络）');
-                setStatus('⏳ 正在播放，等待达到 85% 字节处触发 C++ 断流...', '#fef3c7', '#92400e');
+                log('▶️ 开始播放测试（发送 250KB 数据起播后 1 秒强行断流）');
+                setStatus('⏳ 正在播放，等待 1 秒后触发 C++ 断流...', '#fef3c7', '#92400e');
             } else {
                 log('▶️ 开始播放测试（正常全量流程）');
                 setStatus('⏳ 正在加载正常视频...', '#e0f2fe', '#075985');
