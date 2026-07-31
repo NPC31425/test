@@ -9,40 +9,44 @@ self.addEventListener('fetch', (event) => {
         event.respondWith(
             fetch(testVideoUrl, { mode: 'cors' })
                 .then((response) => {
-                    if (!response.ok) throw new Error(`Fetch 失败: ${response.status}`);
+                    if (!response.ok) throw new Error(`MDN 请求失败: ${response.status}`);
 
                     if (!shouldSimulateError) {
                         return response; // 正常播放直接透传
                     }
 
                     const reader = response.body.getReader();
-                    let isAborted = false;
+                    let bytesRead = 0;
+                    // flower.webm 约 750KB
+                    // 放行前 250KB (约 30%)：足够解析 Header 并启动播放
+                    const cutoffBytes = 250 * 1024;
 
                     const faultyStream = new ReadableStream({
-                        start(controller) {
-                            // 💡 关键：延迟 1.5 秒后再闭关数据管道
-                            // 这 1.5 秒足够 FFmpegDemuxer 解析完 Header 并让视频开始播放
-                            setTimeout(() => {
-                                isAborted = true;
-                                controller.error(new TypeError('Simulated Mid-Stream Network Failure'));
-                            }, 1500);
-
-                            function pump() {
-                                reader.read().then(({ done, value }) => {
-                                    if (isAborted) return; // 已中断，不再继续
-
+                        async start(controller) {
+                            try {
+                                while (true) {
+                                    const { done, value } = await reader.read();
                                     if (done) {
                                         controller.close();
                                         return;
                                     }
 
+                                    bytesRead += value.byteLength;
                                     controller.enqueue(value);
-                                    pump();
-                                }).catch((err) => {
-                                    if (!isAborted) controller.error(err);
-                                });
+
+                                    // 当推送完 250KB 数据后，立即挂起传输
+                                    if (bytesRead >= cutoffBytes) {
+                                        // 暂停 1 秒，给前端足够时间触发 onplaying 并进入播放状态
+                                        await new Promise(resolve => setTimeout(resolve, 1000));
+                                        
+                                        // 1秒后在 FFmpegDemuxer 读取后续数据时强行闭关数据管道
+                                        controller.error(new TypeError('Simulated Mid-Stream Read Error'));
+                                        return;
+                                    }
+                                }
+                            } catch (err) {
+                                controller.error(err);
                             }
-                            pump();
                         }
                     });
 
